@@ -89,6 +89,19 @@ def parse_adilet_endpoint():
     return jsonify(final_result)
 
 
+def process_data_from_ai(result, question):
+    format_egov_data = format_egov_output(result, question)
+    user_message = format_egov_data["message_format"] + format_egov_data["prompt"]
+    shortened_prompt = " ".join(user_message.split())
+    shortened_prompt = shortened_prompt if len(shortened_prompt) <= 10000 else shortened_prompt[:10000]
+    response = process_search_queries(shortened_prompt)
+
+    try:
+        struct_data = ast.literal_eval(response)
+        return struct_data
+    except Exception as e:
+        return {"code": 400, "error": str(e)}
+
 @app.route('/search', methods=['POST'])
 def search_endpoint():
     data = request.json
@@ -103,7 +116,7 @@ def search_endpoint():
     else:
         return jsonify({"error": "Too short request"}), 400
 
-    print(data)
+    response = {}
 
     try:
         for source in data.get("research", []):
@@ -111,9 +124,8 @@ def search_endpoint():
             if tool is None:
                 continue
 
-            print(tool)
-
             if tool == 'Egov':
+                response['egov'] = {}
                 for param in source.get("params", []):
                     data_type = param.get("type", None)
 
@@ -123,22 +135,48 @@ def search_endpoint():
                             parsing_result = parse_dialog(query, begin_date, max_pages=max_pages)
                             result.append(parsing_result)
 
-                        format_egov_data = format_egov_output(result, question)
-                        user_message = format_egov_data["message_format"] + format_egov_data["prompt"]
-                        shortened_prompt = " ".join(user_message.split())
-                        shortened_prompt = shortened_prompt if len(shortened_prompt) <= 10000 else shortened_prompt[:10000]
-                        response = process_search_queries(shortened_prompt)
+                        response['egov']["dialog"] = process_data_from_ai(result, question)
 
-                        try:
-                            struct_data = ast.literal_eval(response)
-                            print(struct_data)
-                        except Exception as e:
-                            print("Error evaluating extracted text:", e)
+                    if data_type == 'Opendata':
+                        result = []
+                        for query in param.get("keywords", []):
+                            parsing_result = parse_opendata(query, max_pages=max_pages)
+                            result.append(parsing_result)
 
-                        return response
+                        response['egov']["opendata"] = process_data_from_ai(result, question)
+
+                    if data_type == 'NLA':
+                        result = []
+                        for query in param.get("keywords", []):
+                            parsing_result = parse_npa(query, begin_date, max_pages=max_pages)
+                            result.append(parsing_result)
+
+                        response['egov']["npa"] = process_data_from_ai(result, question)
+
+                    if data_type == 'Budgets':
+                        result = []
+                        for query in param.get("keywords", []):
+                            parsing_result = parse_budget(query, max_pages=max_pages)
+                            result.append(parsing_result)
+
+                        response['egov']["budgets"] = process_data_from_ai(result, question)
 
             elif tool == 'Adilet':
-                pass
+                response['adilet'] = {}
+                for param in source.get("params", []):
+                    data_type = param.get("type", None)
+
+                    if data_type == 'NLA':
+                        result = []
+                        for query in param.get("keywords", []):
+                            parsing_result = parse_adilet(query, begin_date, max_pages=max_pages)
+                            result.append(parsing_result)
+
+                        response['adilet']["dialog"] = process_data_from_ai(result, question)
+
+                    if data_type == 'Research':
+                        pass
+
             elif tool == 'Web':
                 pass
             elif tool == 'FB':
@@ -147,7 +185,7 @@ def search_endpoint():
         print(str(e))
         return jsonify({"error": str(e)}), 400
 
-    return {"status": "success", "data": data}, 200
+    return {"status": "success", "response": response}, 200
 
 
 if __name__ == '__main__':
