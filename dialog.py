@@ -84,7 +84,13 @@ def parse_dialog(query_value, begin_date=None, end_date=None, max_pages=1):
         session = requests.Session()
         try:
             # Add a timeout to avoid hanging and potentially triggering fatal errors.
-            response = session.get(base_url, params=params, headers=headers, timeout=10, verify=False)
+            try:
+                response = session.get(base_url, params=params, headers=headers, timeout=10)
+            except SystemExit as se:
+                # Log and handle the system exit explicitly
+                print("SystemExit encountered during request: %s", se)
+                return None
+            # response = session.get(base_url, params=params, headers=headers, timeout=10, verify=False)
             if response.status_code != 200:
                 print("Error loading page %s: %s", page, response.status_code)
                 break
