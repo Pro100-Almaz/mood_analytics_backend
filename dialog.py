@@ -136,9 +136,9 @@ def parse_dialog(query_value, begin_date=None, end_date=None, max_pages=1):
                     #if detailed_info:
                         #data.append(detailed_info)
             page += 1
-            #time.sleep(1)
-        except Exception as e:
-            print(e)
+        except Exception:
+            break
+
         finally:
             session.close()
 
