@@ -93,11 +93,13 @@ def parse_dialog(query_value, begin_date=None, end_date=None, max_pages=1):
             tab_pane = soup.find("div", class_="tab-pane")
             if not tab_pane:
                 print("Parent element 'tab-pane' not found on page %s", page)
+                session.close()
                 break
 
             results = tab_pane.find_all("div", class_="row")
             if not results:
                 print("No result cards on page %s", page)
+                session.close()
                 break
 
             for result in results:
