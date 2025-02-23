@@ -84,7 +84,7 @@ def parse_dialog(query_value, begin_date=None, end_date=None, max_pages=1):
         session = requests.Session()
         try:
             # Add a timeout to avoid hanging and potentially triggering fatal errors.
-            response = session.get(base_url, params=params, headers=headers, timeout=10)
+            response = session.get(base_url, params=params, headers=headers, timeout=10, verify=False)
             if response.status_code != 200:
                 print("Error loading page %s: %s", page, response.status_code)
                 break
@@ -93,13 +93,11 @@ def parse_dialog(query_value, begin_date=None, end_date=None, max_pages=1):
             tab_pane = soup.find("div", class_="tab-pane")
             if not tab_pane:
                 print("Parent element 'tab-pane' not found on page %s", page)
-                session.close()
                 break
 
             results = tab_pane.find_all("div", class_="row")
             if not results:
                 print("No result cards on page %s", page)
-                session.close()
                 break
 
             for result in results:
@@ -134,7 +132,6 @@ def parse_dialog(query_value, begin_date=None, end_date=None, max_pages=1):
             page += 1
         except Exception as e:
             print("Exception on page %s: %s", page, e)
-            # Optionally, break or continue to the next page.
             break
         finally:
             session.close()
