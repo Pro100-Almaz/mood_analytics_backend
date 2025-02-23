@@ -74,74 +74,64 @@ def parse_dialog(query_value, begin_date=None, end_date=None, max_pages=1):
     page = 1
     data = []
     while page <= int(max_pages):
-        params = {"searchText": query_value, 'page': page, "answered": "true"}
+        params = {"searchText": query_value, "page": page, "answered": "true"}
         if begin_date:
-            params['beginDate'] = begin_date
+            params["beginDate"] = begin_date
         if end_date:
-            params['endDate'] = end_date
-        headers = {
-            'Accept-Language': 'ru',
-        }
+            params["endDate"] = end_date
+        headers = {"Accept-Language": "ru"}
+
         session = requests.Session()
         try:
-            response = session.get(base_url, params=params, headers=headers)
-            #print(response.url)
+            # Add a timeout to avoid hanging and potentially triggering fatal errors.
+            response = session.get(base_url, params=params, headers=headers, timeout=10)
             if response.status_code != 200:
-                #print(f"Ошибка при загрузке страницы {page}: {response.status_code}")
                 break
-            soup = BeautifulSoup(response.text, 'lxml')
-            tab_pane = soup.find('div', class_='tab-pane')
+
+            soup = BeautifulSoup(response.text, "lxml")
+            tab_pane = soup.find("div", class_="tab-pane")
             if not tab_pane:
-                #print(f"Родительский элемент 'tab-pane' не найден на странице {page}")
                 break
 
-            results = tab_pane.find_all('div', class_='row')
+            results = tab_pane.find_all("div", class_="row")
             if not results:
-                #print(f"На странице {page} нет карточек")
                 break
 
-            #print(f"Парсинг страницы {page}...")
             for result in results:
-                readmore_link = result.find('a', class_='readmore')
-                if readmore_link and 'href' in readmore_link.attrs:
-                    link = readmore_link['href']
+                readmore_link = result.find("a", class_="readmore")
+                if readmore_link and "href" in readmore_link.attrs:
+                    link = readmore_link["href"]
                     if "/blogs/all-questions/" not in link:
                         continue
                     type_ = "appeal" if "/blogs/all-questions/" in link else "post"
-                    #print(f"Переход по ссылке: {link}, тип: {type_}")
 
-                    h3 = result.find('h3')
+                    h3 = result.find("h3")
                     if h3.get_text(strip=True) == "Канахин Николай":
                         continue
 
+                    content = None
                     next_node = h3.next_sibling
-                    while next_node:  # Перебираем соседние узлы, пока не найдем текст
-                        if next_node.name is None and next_node.strip():  # Если это текстовый узел
+                    while next_node:
+                        if next_node.name is None and next_node.strip():
                             content = next_node.strip()
-                            #print(f"Текст после <h3>: {next_node.strip()}")
                             break
-                        next_node = next_node.next_sibling  # Переходим к следующему узлу
+                        next_node = next_node.next_sibling
 
                     if content is None:
-                        paragraph = result.find('p')
+                        paragraph = result.find("p")
                         if paragraph:
-                            content = paragraph.strip()
+                            content = paragraph.get_text(strip=True)
 
                     data.append({
                         "url": f"https://dialog.egov.kz{link}",
-                        "short_description": content
+                        "short_description": content or "",
                     })
-
-                    #detailed_info = get_detailed_info(f"https://dialog.egov.kz{link}", type_)
-                    #if detailed_info:
-                        #data.append(detailed_info)
             page += 1
-        except Exception:
+        except Exception as e:
             break
-
         finally:
             session.close()
-
     return data
+
 
 
