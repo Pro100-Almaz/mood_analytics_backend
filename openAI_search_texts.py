@@ -86,8 +86,8 @@ Structure: array of objects: each object should have a tool name and an array of
 json obj array name must be research
 """
 
-def get_search_queries(search_queries, keywords=""):
-    additional_text = f"\nSearch Queries: {search_queries}\nKeywords: {keywords}"
+def get_search_queries(search_queries):
+    additional_text = f"\nSearch Queries: {search_queries}\n"
     complete_prompt = prompt + additional_text
     # Make the API call to GPT-4
     try:
@@ -102,6 +102,7 @@ def get_search_queries(search_queries, keywords=""):
         raise ConnectionError("Network error. Exception: ", str(e))
 
     response_content = response.choices[0].message.content
+    print(response_content)
 
     try:
         result_json = json.loads(response_content)
@@ -126,3 +127,7 @@ def process_search_queries(user_message):
         return assistant_reply
     except Exception as e:
         return None
+
+
+def get_public_opinion(messages):
+    pass

@@ -24,12 +24,9 @@ def get_detailed_data(link, session):
         data_response.raise_for_status()
         dataset_data = data_response.json()
         return {"info": dataset_info, "data": dataset_data, "link": link}
-    except requests.exceptions.RequestException as e:
+    except Exception as e:
         print(f"Ошибка при получении данных: {e}")
-        return None
-    except ValueError as e:
-        print(e)
-        return None
+        return {}
 
 
 def parse_opendata(query_value, max_pages=1):

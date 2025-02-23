@@ -30,6 +30,8 @@ def process_data_from_ai(result, question):
     shortened_prompt = shortened_prompt if len(shortened_prompt) <= 10000 else shortened_prompt[:10000]
     response = process_search_queries(shortened_prompt)
 
+    print(response)
+
     try:
         struct_data = ast.literal_eval(response)
         return struct_data
@@ -53,6 +55,7 @@ def search_endpoint():
     response = {}
 
     try:
+        print(data)
         for source in data.get("research", []):
             tool = source.get("tool", None)
             if tool is None:
@@ -75,25 +78,51 @@ def search_endpoint():
                         result = []
                         for query in param.get("keywords", []):
                             parsing_result = parse_opendata(query, max_pages=max_pages)
-                            result.append(parsing_result)
+                            for record in parsing_result:
+                                try:
+                                    result.append({
+                                        'link': record['link'],
+                                        'summary': record['info']['descriptionKk'],
+                                        'relev_score': '0.9'
+                                    })
+                                except Exception as e:
+                                    continue
 
-                        response['egov']["opendata"] = process_data_from_ai(result, question)
+                        response['egov']["opendata"] = result
+
+                        return response
 
                     if data_type == 'NLA':
                         result = []
                         for query in param.get("keywords", []):
                             parsing_result = parse_npa(query, begin_date, max_pages=max_pages)
-                            result.append(parsing_result)
+                            for record in parsing_result:
+                                try:
+                                    result.append({
+                                        'link': record['details_url'],
+                                        'summary': record['title'],
+                                        'relev_score': '0.9'
+                                    })
+                                except Exception as e:
+                                    continue
 
-                        response['egov']["npa"] = process_data_from_ai(result, question)
+                        response['egov']["npa"] = result
 
                     if data_type == 'Budgets':
                         result = []
                         for query in param.get("keywords", []):
                             parsing_result = parse_budget(query, max_pages=max_pages)
-                            result.append(parsing_result)
+                            for record in parsing_result:
+                                try:
+                                    result.append({
+                                        'link': record['detail_url'],
+                                        'summary': record['title'],
+                                        'relev_score': '0.9'
+                                    })
+                                except Exception as e:
+                                    continue
 
-                        response['egov']["budgets"] = process_data_from_ai(result, question)
+                        response['egov']["npa"] = result
 
             elif tool == 'Adilet':
                 response['adilet'] = {}
@@ -104,9 +133,17 @@ def search_endpoint():
                         result = []
                         for query in param.get("keywords", []):
                             parsing_result = parse_adilet(query, begin_date, max_pages=max_pages)
-                            result.append(parsing_result)
+                            for record in parsing_result:
+                                try:
+                                    result.append({
+                                        'link': record['detail_url'],
+                                        'summary': record['title'],
+                                        'relev_score': '0.9'
+                                    })
+                                except Exception as e:
+                                    continue
 
-                        response['adilet']["dialog"] = process_data_from_ai(result, question)
+                        response['egov']["npa"] = result
 
                     if data_type == 'Research':
                         pass
@@ -118,6 +155,8 @@ def search_endpoint():
     except Exception as e:
         print(str(e))
         return jsonify({"error": str(e)}), 400
+
+    print(response)
 
     return {"status": "success", "response": response}, 200
 
