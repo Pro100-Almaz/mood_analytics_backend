@@ -143,90 +143,90 @@ def search_endpoint():
             if tool is None:
                 continue
 
-            # if tool == 'Egov':
-            #     response['egov'] = {}
-            #     for param in source.get("params", []):
-            #         data_type = param.get("type", None)
-            #
-            #         if data_type == 'Dialog':
-            #             result = []
-            #             for query in param.get("keywords", []):
-            #                 parsing_result = parse_dialog(query, begin_date, max_pages=max_pages)
-            #                 result.append(parsing_result)
-            #
-            #             response['egov']["dialog"] = process_data_from_ai(result, question)
-            #
-            #         if data_type == 'Opendata':
-            #             result = []
-            #             for query in param.get("keywords", []):
-            #                 parsing_result = parse_opendata(query, max_pages=max_pages)
-            #                 for record in parsing_result:
-            #                     try:
-            #                         result.append({
-            #                             'link': record['link'],
-            #                             'summary': record['info']['descriptionKk'],
-            #                             'relev_score': '0.9'
-            #                         })
-            #                     except Exception as e:
-            #                         continue
-            #
-            #             response['egov']["opendata"] = result
-            #
-            #         if data_type == 'NLA':
-            #             result = []
-            #             for query in param.get("keywords", []):
-            #                 parsing_result = parse_npa(query, begin_date, max_pages=max_pages)
-            #                 for record in parsing_result:
-            #                     try:
-            #                         result.append({
-            #                             'link': record['details_url'],
-            #                             'summary': record['title'],
-            #                             'relev_score': '0.9'
-            #                         })
-            #                     except Exception as e:
-            #                         continue
-            #
-            #             response['egov']["npa"] = result
-            #
-            #         if data_type == 'Budgets':
-            #             result = []
-            #             for query in param.get("keywords", []):
-            #                 parsing_result = parse_budget(query, max_pages=max_pages)
-            #                 for record in parsing_result:
-            #                     try:
-            #                         result.append({
-            #                             'link': record['detail_url'],
-            #                             'summary': record['title'],
-            #                             'relev_score': '0.9'
-            #                         })
-            #                     except Exception as e:
-            #                         continue
-            #
-            #             response['egov']["npa"] = result
-            #
-            # elif tool == 'Adilet':
-            #     response['adilet'] = {}
-            #     for param in source.get("params", []):
-            #         data_type = param.get("type", None)
-            #
-            #         if data_type == 'NLA':
-            #             result = []
-            #             for query in param.get("keywords", []):
-            #                 parsing_result = parse_adilet(query, begin_date, max_pages=max_pages)
-            #                 for record in parsing_result:
-            #                     try:
-            #                         result.append({
-            #                             'link': record['detail_url'],
-            #                             'summary': record['title'],
-            #                             'relev_score': '0.9'
-            #                         })
-            #                     except Exception as e:
-            #                         continue
-            #
-            #             response['egov']["npa"] = result
-            #
-            #         if data_type == 'Research':
-            #             pass
+            if tool == 'Egov':
+                response['egov'] = {}
+                for param in source.get("params", []):
+                    data_type = param.get("type", None)
+
+                    if data_type == 'Dialog':
+                        result = []
+                        for query in param.get("keywords", []):
+                            parsing_result = parse_dialog(query, begin_date, max_pages=max_pages)
+                            result.append(parsing_result)
+
+                        response['egov']["dialog"] = process_data_from_ai(result, question)
+
+                    if data_type == 'Opendata':
+                        result = []
+                        for query in param.get("keywords", []):
+                            parsing_result = parse_opendata(query, max_pages=max_pages)
+                            for record in parsing_result:
+                                try:
+                                    result.append({
+                                        'link': record['link'],
+                                        'summary': record['info']['descriptionKk'],
+                                        'relev_score': '0.9'
+                                    })
+                                except Exception as e:
+                                    continue
+
+                        response['egov']["opendata"] = result
+
+                    if data_type == 'NLA':
+                        result = []
+                        for query in param.get("keywords", []):
+                            parsing_result = parse_npa(query, begin_date, max_pages=max_pages)
+                            for record in parsing_result:
+                                try:
+                                    result.append({
+                                        'link': record['details_url'],
+                                        'summary': record['title'],
+                                        'relev_score': '0.9'
+                                    })
+                                except Exception as e:
+                                    continue
+
+                        response['egov']["npa"] = result
+
+                    if data_type == 'Budgets':
+                        result = []
+                        for query in param.get("keywords", []):
+                            parsing_result = parse_budget(query, max_pages=max_pages)
+                            for record in parsing_result:
+                                try:
+                                    result.append({
+                                        'link': record['detail_url'],
+                                        'summary': record['title'],
+                                        'relev_score': '0.9'
+                                    })
+                                except Exception as e:
+                                    continue
+
+                        response['egov']["npa"] = result
+
+            elif tool == 'Adilet':
+                response['adilet'] = {}
+                for param in source.get("params", []):
+                    data_type = param.get("type", None)
+
+                    if data_type == 'NLA':
+                        result = []
+                        for query in param.get("keywords", []):
+                            parsing_result = parse_adilet(query, begin_date, max_pages=max_pages)
+                            for record in parsing_result:
+                                try:
+                                    result.append({
+                                        'link': record['detail_url'],
+                                        'summary': record['title'],
+                                        'relev_score': '0.9'
+                                    })
+                                except Exception as e:
+                                    continue
+
+                        response['egov']["npa"] = result
+
+                    if data_type == 'Research':
+                        pass
 
             elif tool == 'Web':
                 user_query = source.get("params", [])
