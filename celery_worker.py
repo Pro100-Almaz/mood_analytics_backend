@@ -1,11 +1,40 @@
 from celery import Celery
 import requests
+import os
+import ast
+from dotenv import load_dotenv
+from data_formating import format_egov_output
 
-# Import your heavy processing functions here:
-from app import parse_dialog, parse_opendata, parse_npa, parse_budget, parse_adilet, get_search_queries, process_data_from_ai, PERPLEXITY_API_KEY
+from adilet import parse_adilet
+from dialog import parse_dialog
+from npa import parse_npa
+from budget import parse_budget
+from opendata import parse_opendata
+from openAI_search_texts import get_search_queries, process_search_queries
+
+load_dotenv()
+
+PERPLEXITY_API_KEY = os.environ.get("API_TOKEN")
+
 
 # Configure Celery with a Redis broker (adjust if needed)
 celery_app = Celery('tasks', broker='redis://localhost:6379/0', backend='redis://localhost:6379/0')
+
+
+def process_data_from_ai(result, question):
+    format_egov_data = format_egov_output(result, question)
+    user_message = format_egov_data["message_format"] + format_egov_data["prompt"]
+    shortened_prompt = " ".join(user_message.split())
+    shortened_prompt = shortened_prompt if len(shortened_prompt) <= 10000 else shortened_prompt[:10000]
+    response = process_search_queries(shortened_prompt)
+
+    print(response)
+
+    try:
+        struct_data = ast.literal_eval(response)
+        return struct_data
+    except Exception as e:
+        return {"code": 400, "error": str(e)}
 
 
 @celery_app.task

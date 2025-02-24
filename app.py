@@ -1,21 +1,11 @@
-import glob
-import requests
 import os
-import ast
 import psycopg2
 import io
 from flask import Flask, request, jsonify
 from docx import Document
-from adilet import parse_adilet
-from dialog import parse_dialog
-from npa import parse_npa
-from budget import parse_budget
-from openAI_search_texts import get_search_queries, process_search_queries
-from opendata import parse_opendata
 from supabase import create_client, Client
 from dotenv import load_dotenv
 from flask_cors import CORS
-from data_formating import format_egov_output
 from celery_worker import process_search_task
 
 
@@ -105,24 +95,6 @@ def save_to_postgres(text):
     except Exception as e:
         return {"error": str(e)}
 
-
-
-
-
-def process_data_from_ai(result, question):
-    format_egov_data = format_egov_output(result, question)
-    user_message = format_egov_data["message_format"] + format_egov_data["prompt"]
-    shortened_prompt = " ".join(user_message.split())
-    shortened_prompt = shortened_prompt if len(shortened_prompt) <= 10000 else shortened_prompt[:10000]
-    response = process_search_queries(shortened_prompt)
-
-    print(response)
-
-    try:
-        struct_data = ast.literal_eval(response)
-        return struct_data
-    except Exception as e:
-        return {"code": 400, "error": str(e)}
 
 @app.route('/search', methods=['POST'])
 @app.route('/search', methods=['POST'])
