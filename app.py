@@ -16,6 +16,7 @@ from supabase import create_client, Client
 from dotenv import load_dotenv
 from flask_cors import CORS
 from data_formating import format_egov_output
+from celery_worker import process_search_task
 
 
 load_dotenv()
@@ -105,6 +106,9 @@ def save_to_postgres(text):
         return {"error": str(e)}
 
 
+
+
+
 def process_data_from_ai(result, question):
     format_egov_data = format_egov_output(result, question)
     user_message = format_egov_data["message_format"] + format_egov_data["prompt"]
@@ -121,156 +125,35 @@ def process_data_from_ai(result, question):
         return {"code": 400, "error": str(e)}
 
 @app.route('/search', methods=['POST'])
+@app.route('/search', methods=['POST'])
 def search_endpoint():
     data = request.json
-    question = data.get("query", None)
+    question = data.get("query")
     full = data.get("full", False)
 
-    begin_date = "01.05.2021"
-
-    if len(question) > 10:
-        max_pages = 1 if full else 5
-        data = get_search_queries(question)
-    else:
+    if not question or len(question) <= 10:
         return jsonify({"error": "Too short request"}), 400
 
-    response = {}
+    # Launch the Celery task (asynchronously)
+    task = process_search_task.delay(question, full)
 
-    try:
-        print(data)
-        for source in data.get("research", []):
-            tool = source.get("tool", None)
-            if tool is None:
-                continue
+    # Return immediately with the task ID so the frontend can poll for status
+    return jsonify({"task_id": task.id}), 202
 
-            if tool == 'Egov':
-                response['egov'] = {}
-                for param in source.get("params", []):
-                    data_type = param.get("type", None)
 
-                    if data_type == 'Dialog':
-                        result = []
-                        for query in param.get("keywords", []):
-                            parsing_result = parse_dialog(query, begin_date, max_pages=max_pages)
-                            result.append(parsing_result)
+@app.route('/search_status/<task_id>', methods=['GET'])
+def search_status(task_id):
+    from celery.result import AsyncResult
+    task = AsyncResult(task_id)
 
-                        response['egov']["dialog"] = process_data_from_ai(result, question)
+    if task.state == "PENDING":
+        response = {"state": task.state, "status": "Pending..."}
+    elif task.state != "FAILURE":
+        response = {"state": task.state, "result": task.result}
+    else:
+        response = {"state": task.state, "status": str(task.info)}
 
-                    if data_type == 'Opendata':
-                        result = []
-                        for query in param.get("keywords", []):
-                            parsing_result = parse_opendata(query, max_pages=max_pages)
-                            for record in parsing_result:
-                                try:
-                                    result.append({
-                                        'link': record['link'],
-                                        'summary': record['info']['descriptionKk'],
-                                        'relev_score': '0.9'
-                                    })
-                                except Exception as e:
-                                    continue
-
-                        response['egov']["opendata"] = result
-
-                    if data_type == 'NLA':
-                        result = []
-                        for query in param.get("keywords", []):
-                            parsing_result = parse_npa(query, begin_date, max_pages=max_pages)
-                            for record in parsing_result:
-                                try:
-                                    result.append({
-                                        'link': record['details_url'],
-                                        'summary': record['title'],
-                                        'relev_score': '0.9'
-                                    })
-                                except Exception as e:
-                                    continue
-
-                        response['egov']["npa"] = result
-
-                    if data_type == 'Budgets':
-                        result = []
-                        for query in param.get("keywords", []):
-                            parsing_result = parse_budget(query, max_pages=max_pages)
-                            for record in parsing_result:
-                                try:
-                                    result.append({
-                                        'link': record['detail_url'],
-                                        'summary': record['title'],
-                                        'relev_score': '0.9'
-                                    })
-                                except Exception as e:
-                                    continue
-
-                        response['egov']["npa"] = result
-
-            elif tool == 'Adilet':
-                response['adilet'] = {}
-                for param in source.get("params", []):
-                    data_type = param.get("type", None)
-
-                    if data_type == 'NLA':
-                        result = []
-                        for query in param.get("keywords", []):
-                            parsing_result = parse_adilet(query, begin_date, max_pages=max_pages)
-                            for record in parsing_result:
-                                try:
-                                    result.append({
-                                        'link': record['detail_url'],
-                                        'summary': record['title'],
-                                        'relev_score': '0.9'
-                                    })
-                                except Exception as e:
-                                    continue
-
-                        response['egov']["npa"] = result
-
-                    if data_type == 'Research':
-                        pass
-
-            elif tool == 'Web':
-                user_query = source.get("params", [])
-                user_query = ", ".join(user_query)
-                url = "https://api.perplexity.ai/chat/completions"
-
-                headers = {
-                    "Authorization": f"Bearer {PERPLEXITY_API_KEY}",
-                    "Content-Type": "application/json"
-                }
-
-                payload = {
-                    "model": "llama-3.1-sonar-small-128k-online",
-                    "messages": [
-                        {
-                            "role": "system",
-                            "content": "Будьте точным, СВЕРХКРАТКИМ и лаконичным исследователем для правительства Казахстана. Отвечай все на русском! Исключи анализ НПА и законов."
-                        },
-                        {
-                            "role": "user",
-                            "content": f"Запрос: {user_query}. В начало своего ответа поставь мой первичный запрос без пояснений и потом твой ответ"
-                        }
-                    ]
-                }
-
-                url_response = requests.post(url, json=payload, headers=headers)
-
-                if url_response.status_code == 200:
-                    citations = url_response.json()["citations"]
-                    research = url_response.json()["choices"][0]["message"]["content"]
-                    response['web'] = {
-                        "citations": citations,
-                        "research": research
-                    }
-
-            elif tool == 'FB':
-                pass
-    except Exception as e:
-        print(str(e))
-        return jsonify({"error": str(e)}), 400
-
-    print(response)
-
-    return {"status": "success", "response": response}, 200
+    return jsonify(response)
 
 
 # Flask route to handle file uploads
