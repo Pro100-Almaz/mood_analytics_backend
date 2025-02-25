@@ -80,17 +80,9 @@ def process_search_task(question, full):
                         result = []
                         for query in param.get("keywords", []):
                             parsing_result = parse_npa(query, begin_date, max_pages=max_pages)
-                            for record in parsing_result:
-                                try:
-                                    result.append({
-                                        'link': record['details_url'],
-                                        'summary': record['title'],
-                                        'relev_score': '0.9'
-                                    })
-                                except Exception:
-                                    continue
-                        response['egov']["npa"] = result
+                            result.append(parsing_result)
 
+                        response['egov']["npa"] = process_data_from_ai(result, question)
                     elif data_type == 'Budgets':
                         result = []
                         for query in param.get("keywords", []):
@@ -114,16 +106,9 @@ def process_search_task(question, full):
                         result = []
                         for query in param.get("keywords", []):
                             parsing_result = parse_adilet(query, begin_date, max_pages=max_pages)
-                            for record in parsing_result:
-                                try:
-                                    result.append({
-                                        'link': record['detail_url'],
-                                        'summary': record['title'],
-                                        'relev_score': '0.9'
-                                    })
-                                except Exception:
-                                    continue
-                        response['adilet']["npa"] = result
+                            result.append(parsing_result)
+
+                        response['adilet']["npa"] = process_data_from_ai(result, question)
                     elif data_type == 'Research':
                         # Add your processing for Research if needed
                         pass
