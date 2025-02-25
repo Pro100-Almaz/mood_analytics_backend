@@ -153,20 +153,38 @@ def upload_file():
         return jsonify({"error": f"Error processing file: {str(e)}"}), 500
 
 
-# Route to fetch saved documents
 @app.route("/digests", methods=["GET"])
 def fetch_documents():
     try:
+        # Get pagination parameters from query string; default: page=1, per_page=10
+        page = request.args.get("page", default=1, type=int)
+        per_page = request.args.get("per_page", default=10, type=int)
+        offset = (page - 1) * per_page
+
         conn = psycopg2.connect(**DB_CONFIG)
         cursor = conn.cursor()
 
-        cursor.execute("SELECT id, title, date FROM digest ORDER BY date")
+        # First, count the total number of rows
+        cursor.execute("SELECT COUNT(*) FROM digest")
+        total_count = cursor.fetchone()[0]
+
+        # Then, fetch only the rows for the current page
+        cursor.execute(
+            "SELECT id, title, date FROM digest ORDER BY date LIMIT %s OFFSET %s",
+            (per_page, offset)
+        )
         rows = cursor.fetchall()
 
         cursor.close()
         conn.close()
 
-        return jsonify([{"id": row[0], "title": row[1], "date": row[2]} for row in rows])
+        response = {
+            "total_count": total_count,
+            "page": page,
+            "per_page": per_page,
+            "data": [{"id": row[0], "title": row[1], "date": row[2]} for row in rows]
+        }
+        return jsonify(response)
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500
