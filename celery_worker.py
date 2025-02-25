@@ -5,11 +5,11 @@ import ast
 from dotenv import load_dotenv
 from data_formating import format_egov_output
 
-from adilet import parse_adilet
-from dialog import parse_dialog
-from npa import parse_npa
-from budget import parse_budget
-from opendata import parse_opendata
+from parsing_scripts.adilet import parse_adilet
+from parsing_scripts.dialog import parse_dialog
+from parsing_scripts.npa import parse_npa
+from parsing_scripts.budget import parse_budget
+from parsing_scripts.opendata import parse_opendata
 from openAI_search_texts import get_search_queries, process_search_queries
 
 load_dotenv()

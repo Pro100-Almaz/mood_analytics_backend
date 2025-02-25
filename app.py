@@ -1,12 +1,13 @@
 import os
 import psycopg2
 import io
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, send_file
 from docx import Document
 from supabase import create_client, Client
 from dotenv import load_dotenv
 from flask_cors import CORS
 from celery_worker import process_search_task
+from docxtpl import DocxTemplate
 
 
 load_dotenv()
@@ -196,31 +197,52 @@ def fetch_document():
         conn = psycopg2.connect(**DB_CONFIG)
         cursor = conn.cursor()
 
-        # Get ID from query parameters
         doc_id = request.args.get("id")
-
-        if doc_id:  # If ID is provided, fetch specific document
-            cursor.execute("SELECT id, title, date FROM digest WHERE id = %s", (doc_id,))
+        if doc_id:
+            cursor.execute("SELECT * FROM digest WHERE id = %s", (doc_id,))
             row = cursor.fetchone()
-            cursor.close()
-            conn.close()
-
-            if row:
-                return jsonify({"id": row[0], "title": row[1], "date": row[2]})
-            else:
+            if not row:
+                cursor.close()
+                conn.close()
                 return jsonify({"error": "Document not found"}), 404
+            rows = [{"id": row[0], }]
+        else:
+            return jsonify({"error": "Too short request"}), 400
 
-        else:  # If no ID is provided, return all documents
-            cursor.execute("SELECT id, title, date FROM documents")
-            rows = cursor.fetchall()
-            cursor.close()
-            conn.close()
+        cursor.close()
+        conn.close()
 
-            return jsonify([{"id": row[0], "title": row[1], "date": row[2]} for row in rows])
+        doc = DocxTemplate("template.docx")
+
+        context = {
+            "title": row[1],
+            "date": row[2],
+            "statistic": row[3],
+            "description": row[4],
+            "source": row[5],
+            "articles_publication": row[6],
+            "opinion": row[7],
+            "dominating_opinion": row[8]
+        }
+        doc.render(context)
+
+        buffer = io.BytesIO()
+        doc.save(buffer)
+        buffer.seek(0)
+
+        return send_file(
+            buffer,
+            as_attachment=True,
+            download_name="digest_report.docx",
+            mimetype="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        )
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+
+if __name__ == "__main__":
+    app.run(debug=True)
 
 if __name__ == '__main__':
     print("Starting flask project!")
