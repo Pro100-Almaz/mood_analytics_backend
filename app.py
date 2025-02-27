@@ -97,7 +97,29 @@ def save_to_postgres(text):
         return {"error": str(e)}
 
 
-@app.route('/search', methods=['POST'])
+def save_request_to_postgres(query):
+    try:
+        conn = psycopg2.connect(**DB_CONFIG)
+        cursor = conn.cursor()
+
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS history (
+                id SERIAL PRIMARY KEY,
+                query TEXT,
+                created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+
+        cursor.execute("INSERT INTO history (query) VALUES (%s)", (query,))
+        conn.commit()
+
+        cursor.close()
+        conn.close()
+        return {"message": "Data saved successfully."}
+    except Exception as e:
+        return {"error": str(e)}
+
+
 @app.route('/search', methods=['POST'])
 def search_endpoint():
     data = request.json
@@ -110,8 +132,39 @@ def search_endpoint():
     # Launch the Celery task (asynchronously)
     task = process_search_task.delay(question, full)
 
+    save_request_to_postgres(question)
+
     # Return immediately with the task ID so the frontend can poll for status
     return jsonify({"task_id": task.id}), 202
+
+
+@app.route('/least', methods=['GET'])
+def search_endpoint():
+    try:
+        conn = psycopg2.connect(**DB_CONFIG)
+        cursor = conn.cursor()
+
+        cursor.execute("""
+                SELECT id, query, created_at
+                FROM history
+                ORDER BY created_at ASC
+                LIMIT 10
+            """)
+
+        records = cursor.fetchall()
+        results = []
+        for record in records:
+            results.append({
+                "id": record[0],
+                "query": record[1],
+                "created_at": record[2].isoformat() if record[2] else None
+            })
+
+        cursor.close()
+        conn.close()
+        return results
+    except Exception as e:
+        return {"error": str(e)}
 
 
 @app.route('/search_status/<task_id>', methods=['GET'])

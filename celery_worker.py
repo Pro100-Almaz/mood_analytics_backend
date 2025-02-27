@@ -15,6 +15,9 @@ from openAI_search_texts import get_search_queries, process_search_queries
 load_dotenv()
 
 PERPLEXITY_API_KEY = os.environ.get("API_TOKEN")
+APIFY_TOKEN = os.environ.get("APIFY_TOKEN")
+
+APIFY_POST_URL = "https://api.apify.com/v2/acts/danek~facebook-search-ppr/run-sync-get-dataset-items"
 
 
 # Configure Celery with a Redis broker (adjust if needed)
@@ -143,8 +146,34 @@ def process_search_task(question, full):
                     response['web'] = {"citations": citations, "research": research}
 
             elif tool == 'FB':
-                # Process Facebook data if applicable
-                pass
+                location = "Almaty"
+                max_posts = 20
+                search_type = "posts"
+                all_results = {}
+
+                for param in source.get("params", []):
+                    payload = {
+                        "location": location,
+                        "max_posts": max_posts,
+                        "query": param,
+                        "search_type": search_type
+                    }
+
+                    url = APIFY_POST_URL
+                    if APIFY_TOKEN:
+                        url += f"?token={APIFY_TOKEN}"
+
+                    response = requests.post(url, json=payload, headers={"Content-Type": "application/json"})
+
+                    if 200 <= response.status_code < 300:
+                        temp_res = []
+                        data = response.json()
+                        for post in data:
+                            temp_res.append({
+                                'url': post['url'],
+                                'message': post['message']
+                            })
+                        all_results[param] = temp_res
 
     except Exception as e:
         # Optionally, you can log e and return an error object
