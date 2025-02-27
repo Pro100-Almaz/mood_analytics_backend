@@ -17,7 +17,8 @@ load_dotenv()
 PERPLEXITY_API_KEY = os.environ.get("API_TOKEN")
 APIFY_TOKEN = os.environ.get("APIFY_TOKEN")
 
-APIFY_POST_URL = "https://api.apify.com/v2/acts/danek~facebook-search-ppr/run-sync-get-dataset-items"
+APIFY_ACTOR_URL = "https://api.apify.com/v2/acts/danek~facebook-search-ppr/run-sync-get-dataset-items"
+APIFY_COMMENTS_URL = "https://api.apify.com/v2/acts/apify~facebook-comments-scraper/run-sync-get-dataset-items"
 
 
 # Configure Celery with a Redis broker (adjust if needed)
@@ -38,6 +39,68 @@ def process_data_from_ai(result, question):
         return struct_data
     except Exception as e:
         return {"code": 400, "error": str(e)}
+
+
+def process_posts(keywords):
+    all_posts = []
+
+    for keyword in keywords:
+        payload = {
+            "location": "Almaty",
+            "max_posts": 20,
+            "query": keyword,
+            "search_type": "posts"
+        }
+
+        url = APIFY_ACTOR_URL
+        if APIFY_TOKEN:
+            url += f"?token={APIFY_TOKEN}"
+
+        response = requests.post(url, json=payload, headers={"Content-Type": "application/json"})
+
+        if 200 <= response.status_code < 300:
+            data = response.json()
+            for post in data:
+                all_posts.append({
+                    'post_id': post['post_id'],
+                    'url': post['url'],
+                    'message': post['message']
+                })
+
+    return all_posts
+
+
+def fetch_comments_for_posts(posts):
+    all_comments = []
+
+    payload = {
+        "includeNestedComments": False,
+        "resultsLimit": 50,
+        "startUrls": [
+            {
+                "url": post.get('url'),
+            } for post in posts
+        ]
+    }
+
+    url = APIFY_COMMENTS_URL
+    if APIFY_TOKEN:
+        url += f"?token={APIFY_TOKEN}"
+
+    headers = {"Content-Type": "application/json"}
+    response = requests.post(url, json=payload, headers=headers)
+
+    if 200 <= response.status_code < 300:
+        data = response.json()
+        for comment in data:
+            all_comments.append(
+                {
+                    'url': comment['facebookUrl'],
+                    'message': comment['text']
+                }
+            )
+
+    return all_comments
 
 
 @celery_app.task
@@ -146,34 +209,11 @@ def process_search_task(question, full):
                     response['web'] = {"citations": citations, "research": research}
 
             elif tool == 'FB':
-                location = "Almaty"
-                max_posts = 20
-                search_type = "posts"
-                all_results = {}
+                keywords = source.get("params", [])
+                posts = process_posts(keywords)
+                comments_data = fetch_comments_for_posts(posts)
 
-                for param in source.get("params", []):
-                    payload = {
-                        "location": location,
-                        "max_posts": max_posts,
-                        "query": param,
-                        "search_type": search_type
-                    }
-
-                    url = APIFY_POST_URL
-                    if APIFY_TOKEN:
-                        url += f"?token={APIFY_TOKEN}"
-
-                    response = requests.post(url, json=payload, headers={"Content-Type": "application/json"})
-
-                    if 200 <= response.status_code < 300:
-                        temp_res = []
-                        data = response.json()
-                        for post in data:
-                            temp_res.append({
-                                'url': post['url'],
-                                'message': post['message']
-                            })
-                        all_results[param] = temp_res
+                response['facebook'] = comments_data
 
     except Exception as e:
         # Optionally, you can log e and return an error object
