@@ -139,7 +139,7 @@ def search_endpoint():
 
 
 @app.route('/least', methods=['GET'])
-def search_endpoint():
+def least_endpoint():
     try:
         conn = psycopg2.connect(**DB_CONFIG)
         cursor = conn.cursor()
