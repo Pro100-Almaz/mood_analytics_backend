@@ -90,13 +90,14 @@ def fetch_comments_for_posts(posts):
     headers = {"Content-Type": "application/json"}
     response = requests.post(url, json=payload, headers=headers)
 
+
     if 200 <= response.status_code < 300:
         data = response.json()
         for comment in data:
             all_comments.append(
                 {
-                    'url': comment['facebookUrl'],
-                    'message': comment['text']
+                    'url': comment.get('facebookUrl', ""),
+                    'message': comment.get('text', "")
                 }
             )
 
@@ -124,11 +125,14 @@ def process_search_task(question, full):
                 for param in source.get("params", []):
                     data_type = param.get("type")
                     if data_type == 'Dialog':
-                        result = []
-                        for query in param.get("keywords", []):
-                            parsing_result = parse_dialog(query, begin_date, max_pages=max_pages)
-                            result.append(parsing_result)
-                        response['egov']["dialog"] = process_data_from_ai(result, question)
+                        try:
+                            result = []
+                            for query in param.get("keywords", []):
+                                parsing_result = parse_dialog(query, begin_date, max_pages=max_pages)
+                                result.append(parsing_result)
+                            response['egov']["dialog"] = process_data_from_ai(result, question)
+                        except Exception as e:
+                            response['egov']["dialog"] = []
 
                     elif data_type == 'Opendata':
                         result = []
