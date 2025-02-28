@@ -100,6 +100,9 @@ def fetch_comments_for_posts(posts):
                 }
             )
 
+    if len(all_comments) == 0:
+        return posts
+
     return all_comments
 
 
