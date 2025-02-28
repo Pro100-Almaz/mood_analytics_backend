@@ -38,7 +38,7 @@ def process_data_from_ai(result, question):
         struct_data = ast.literal_eval(response)
         return struct_data
     except Exception as e:
-        return {"code": 400, "error": str(e)}
+        return response
 
 
 def process_posts(keywords):
