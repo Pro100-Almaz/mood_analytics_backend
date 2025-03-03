@@ -65,35 +65,64 @@ result_list = []
 #     })
 
 
-all_posts = []
-APIFY_ACTOR_URL = "https://api.apify.com/v2/acts/apify~instagram-post-scraper/run-sync?token=apify_api_JlD1DxdITmx9pjL6j67F13R7zsHSN82f8xxQ"
+# all_posts = []
+# APIFY_ACTOR_URL = "https://api.apify.com/v2/acts/apify~instagram-post-scraper/run-sync?token=apify_api_JlD1DxdITmx9pjL6j67F13R7zsHSN82f8xxQ"
+#
+# payload = {
+#     "usernames": ['tengrinewskz', 'holanewskz', 'qumash_kz', 'kazpress.kz', 'astanovka98',
+#                   'vastane.kz', 'qazpress.kz', 'astana_newtimes', 'taspanewskz', 'kris.p.media'],
+#     "resultsLimit": 50,
+#     "searchType": "posts",
+#     "includeComments": True,
+#     "includeTaggedPosts": False,
+#     "includeStories": False,
+# }
+#
+# url = APIFY_ACTOR_URL
+# if APIFY_TOKEN:
+#     url += f"?token={APIFY_TOKEN}"
+#
+# response = requests.post(url, json=payload, headers={"Content-Type": "application/json"})
+# print(response.json())
+#
+# if 200 <= response.status_code < 300:
+#     data = response.json()
+#     print(data)
+#     for post in data:
+#         all_posts.append({
+#             'post_id': post['post_id'],
+#             'url': post['url'],
+#             'message': post['message']
+#         })
 
-payload = {
-    "usernames": ['tengrinewskz', 'holanewskz', 'qumash_kz', 'kazpress.kz', 'astanovka98',
-                  'vastane.kz', 'qazpress.kz', 'astana_newtimes', 'taspanewskz', 'kris.p.media'],
-    "resultsLimit": 50,
-    "searchType": "posts",
-    "includeComments": True,
-    "includeTaggedPosts": False,
-    "includeStories": False,
+
+user_query = keywords
+user_query_str = ", ".join(user_query)
+url = "https://api.perplexity.ai/chat/completions"
+headers = {
+    "Authorization": f"Bearer {PERPLEXITY_API_KEY}",
+    "Content-Type": "application/json"
 }
-
-url = APIFY_ACTOR_URL
-if APIFY_TOKEN:
-    url += f"?token={APIFY_TOKEN}"
-
-response = requests.post(url, json=payload, headers={"Content-Type": "application/json"})
-print(response.json())
-
-if 200 <= response.status_code < 300:
-    data = response.json()
-    print(data)
-    for post in data:
-        all_posts.append({
-            'post_id': post['post_id'],
-            'url': post['url'],
-            'message': post['message']
-        })
+payload = {
+    "model": "llama-3.1-sonar-small-128k-online",
+    "messages": [
+        {
+            "role": "system",
+            "content": "Будьте точным, СВЕРХКРАТКИМ и лаконичным исследователем для правительства Казахстана. Отвечай все на русском! Исключи анализ НПА и законов."
+        },
+        {
+            "role": "user",
+            "content": f"Запрос: {user_query_str}. В начало своего ответа поставь мой первичный запрос без пояснений и потом твой ответ"
+        }
+    ]
+}
+url_response = requests.post(url, json=payload, headers=headers)
+if url_response.status_code == 200:
+    json_data = url_response.json()
+    citations = json_data.get("citations")
+    research = json_data.get("choices", [{}])[0].get("message", {}).get("content")
+    print({"citations": citations, "research": research})
+    # response['web'] = {"citations": citations, "research": research}
 
 # result = process_data_from_ai(result_list, question)
 #
