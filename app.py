@@ -176,6 +176,8 @@ def search_status(task_id):
         response = {"state": task.state, "status": "Pending..."}
     elif task.state != "FAILURE":
         response = {"state": task.state, "result": task.result}
+        opinion = get_public_opinion(task.result)
+        response.update({"opinion": opinion})
     else:
         response = {"state": task.state, "status": str(task.info)}
 

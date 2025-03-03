@@ -158,7 +158,7 @@ def get_digest_data(opinion_list):
 
 
 def get_public_opinion(messages):
-    complete_prompt = f"\nSearch messages: {messages}\n" + opinion_prompt + prompt
+    complete_prompt = f"\nSearch messages: {messages}\n" + opinion_prompt
     try:
         response = client.chat.completions.create(model="gpt-4",
             messages=[
@@ -169,7 +169,6 @@ def get_public_opinion(messages):
             max_tokens=1500
         )
         assistant_reply = response.choices[0].message.content
-        print(assistant_reply)
         return assistant_reply
     except Exception as e:
         return None
