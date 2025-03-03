@@ -8,7 +8,6 @@ from dotenv import load_dotenv
 from flask_cors import CORS
 from celery_worker import process_search_task
 from docxtpl import DocxTemplate
-from openAI_search_texts import get_public_opinion
 
 load_dotenv()
 app = Flask(__name__)
