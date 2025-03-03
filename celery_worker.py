@@ -354,7 +354,6 @@ def process_search_task(self, question, full):
 
             elif tool == 'Web':
                 try:
-                    # Combine parameters into a single query string
                     user_query = source.get("params", [])
                     user_query_str = ", ".join(user_query)
                     url = "https://api.perplexity.ai/chat/completions"
