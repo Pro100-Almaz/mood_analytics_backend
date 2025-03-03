@@ -198,6 +198,33 @@ def fetch_comments_for_posts_ig(posts):
     return all_comments
 
 
+def track_error(error, step, log_level):
+    try:
+        conn = psycopg2.connect(**DB_CONFIG)
+        cursor = conn.cursor()
+
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS logs (
+                id SERIAL PRIMARY KEY,
+                log_level VARCHAR(10) NOT NULL,
+                message TEXT,
+                step VARCHAR(100),
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        conn.commit()
+
+        cursor.execute(
+            "INSERT INTO logs (log_level, message, step) VALUES (%s, %s, %s)",
+            (log_level, error, step)
+        )
+        conn.commit()
+        cursor.close()
+        conn.close()
+    except Exception as e:
+        print("Error saving log entry:", str(e))
+
+
 @celery_app.task(bind=True)
 def process_search_task(self, question, full):
     begin_date = "01.01.2021"
@@ -237,6 +264,7 @@ def process_search_task(self, question, full):
                             response['egov']['dialog']['assistant_reply'] = summary.get('assistant_reply', [])
                             response['egov']['dialog']['all'] = result
                         except Exception as e:
+                            track_error(str(e), "egov.dialog", "Error")
                             continue
 
                     elif data_type == 'Opendata':
@@ -254,6 +282,7 @@ def process_search_task(self, question, full):
                             response['egov']["opendata"]['assistant_reply'] = process_data_from_ai(result, question).get('assistant_reply', [])
                             response['egov']['opendata']['all'] = result
                         except Exception as e:
+                            track_error(str(e), "egov.opendata", "Error")
                             continue
 
                     elif data_type == 'NLA':
@@ -266,6 +295,7 @@ def process_search_task(self, question, full):
                             response['egov']["npa"]['assistant_reply'] = process_data_from_ai(result, question).get('assistant_reply', [])
                             response['egov']['npa']['all'] = result
                         except Exception as e:
+                            track_error(str(e), "egov.nla", "Error")
                             continue
 
                     elif data_type == 'Budgets':
@@ -286,6 +316,7 @@ def process_search_task(self, question, full):
                             response['egov']["budgets"]['assistant_reply'] = []
                             response['egov']["budgets"]['all'] = result
                         except Exception as e:
+                            track_error(str(e), "egov.budgets", "Error")
                             continue
 
             elif tool == 'Adilet':
@@ -315,56 +346,65 @@ def process_search_task(self, question, full):
                             response['adilet']["npa"]['assistant_reply'] = summary.get('assistant_reply', [])
                             response['adilet']["npa"]['all'] = result
                         except Exception as e:
+                            track_error(str(e), "adilet.nla", "Error")
                             continue
                     elif data_type == 'Research':
                         # Add your processing for Research if needed
                         pass
 
             elif tool == 'Web':
-                # Combine parameters into a single query string
-                user_query = source.get("params", [])
-                user_query_str = ", ".join(user_query)
-                url = "https://api.perplexity.ai/chat/completions"
-                headers = {
-                    "Authorization": f"Bearer {PERPLEXITY_API_KEY}",
-                    "Content-Type": "application/json"
-                }
-                payload = {
-                    "model": "llama-3.1-sonar-small-128k-online",
-                    "messages": [
-                        {
-                            "role": "system",
-                            "content": "Будьте точным, СВЕРХКРАТКИМ и лаконичным исследователем для правительства Казахстана. Отвечай все на русском! Исключи анализ НПА и законов."
-                        },
-                        {
-                            "role": "user",
-                            "content": f"Запрос: {user_query_str}. В начало своего ответа поставь мой первичный запрос без пояснений и потом твой ответ"
-                        }
-                    ]
-                }
-                url_response = requests.post(url, json=payload, headers=headers)
-                if url_response.status_code == 200:
-                    json_data = url_response.json()
-                    citations = json_data.get("citations")
-                    research = json_data.get("choices", [{}])[0].get("message", {}).get("content")
-                    response['web'] = {"citations": citations, "research": research}
+                try:
+                    # Combine parameters into a single query string
+                    user_query = source.get("params", [])
+                    user_query_str = ", ".join(user_query)
+                    url = "https://api.perplexity.ai/chat/completions"
+                    headers = {
+                        "Authorization": f"Bearer {PERPLEXITY_API_KEY}",
+                        "Content-Type": "application/json"
+                    }
+                    payload = {
+                        "model": "llama-3.1-sonar-small-128k-online",
+                        "messages": [
+                            {
+                                "role": "system",
+                                "content": "Будьте точным, СВЕРХКРАТКИМ и лаконичным исследователем для правительства Казахстана. Отвечай все на русском! Исключи анализ НПА и законов."
+                            },
+                            {
+                                "role": "user",
+                                "content": f"Запрос: {user_query_str}. В начало своего ответа поставь мой первичный запрос без пояснений и потом твой ответ"
+                            }
+                        ]
+                    }
+                    url_response = requests.post(url, json=payload, headers=headers)
+                    if url_response.status_code == 200:
+                        json_data = url_response.json()
+                        citations = json_data.get("citations")
+                        research = json_data.get("choices", [{}])[0].get("message", {}).get("content")
+                        response['web'] = {"citations": citations, "research": research}
+                except Exception as e:
+                    track_error(str(e), "web", "Error")
+                    continue
 
             elif tool == 'FB':
-                result = []
-                keywords = source.get("params", [])
-                posts = process_posts_fb(keywords)
-                comments_data = fetch_comments_for_posts_fb(posts)
+                try:
+                    result = []
+                    keywords = source.get("params", [])
+                    posts = process_posts_fb(keywords)
+                    comments_data = fetch_comments_for_posts_fb(posts)
 
-                for comment in comments_data:
-                    result.append({
-                        'url': comment.get('url'),
-                        'short_description': comment.get('message')
-                    })
+                    for comment in comments_data:
+                        result.append({
+                            'url': comment.get('url'),
+                            'short_description': comment.get('message')
+                        })
 
-                summary = process_data_from_ai(result, question)
+                    summary = process_data_from_ai(result, question)
 
-                response['facebook']['assistant_reply'] = summary.get('assistant_reply', [])
-                response['facebook']['all'] = result
+                    response['facebook']['assistant_reply'] = summary.get('assistant_reply', [])
+                    response['facebook']['all'] = result
+                except Exception as e:
+                    track_error(str(e), "fb", "Error")
+                    continue
 
             # elif tool == 'Instagram':
             #     result = []
