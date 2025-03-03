@@ -216,91 +216,106 @@ def process_search_task(self, question, full):
                 for param in source.get("params", []):
                     data_type = param.get("type")
                     if data_type == 'Dialog':
-                        result = []
-                        success_status = False
-                        retries = 0
-                        summary = {}
-                        while not success_status and retries < 5:
-                            for query in param.get("keywords", []):
-                                parsing_result = parse_dialog(query, begin_date, max_pages=max_pages)
-                                if parsing_result:
-                                    for result in parsing_result:
-                                        if not any(item.get("url") == result.get("url") for item in result):
-                                            for data in parsing_result:
-                                                result.append(data)
+                        try:
+                            result = []
+                            success_status = False
+                            retries = 0
+                            summary = {}
+                            while not success_status and retries < 5:
+                                for query in param.get("keywords", []):
+                                    parsing_result = parse_dialog(query, begin_date, max_pages=max_pages)
+                                    if parsing_result:
+                                        for result in parsing_result:
+                                            if not any(item.get("url") == result.get("url") for item in result):
+                                                for data in parsing_result:
+                                                    result.append(data)
 
-                            summary = process_data_from_ai(result, question)
-                            success_status = summary['status'] == 'success'
-                            retries += 1
+                                summary = process_data_from_ai(result, question)
+                                success_status = summary['status'] == 'success'
+                                retries += 1
 
-                        response['egov']['dialog']['assistant_reply'] = summary.get('assistant_reply', [])
-                        response['egov']['dialog']['all'] = result
+                            response['egov']['dialog']['assistant_reply'] = summary.get('assistant_reply', [])
+                            response['egov']['dialog']['all'] = result
+                        except Exception as e:
+                            continue
 
                     elif data_type == 'Opendata':
-                        result = []
-                        for query in param.get("keywords", []):
-                            parsing_result = parse_opendata(query, max_pages=1)
-                            if parsing_result:
-                                for record in parsing_result:
-                                    result.append({
-                                        'url': record['link'],
-                                        'short_description': record['info']['descriptionRu']
-                                    })
+                        try:
+                            result = []
+                            for query in param.get("keywords", []):
+                                parsing_result = parse_opendata(query, max_pages=1)
+                                if parsing_result:
+                                    for record in parsing_result:
+                                        result.append({
+                                            'url': record['link'],
+                                            'short_description': record['info']['descriptionRu']
+                                        })
 
-                        response['egov']["opendata"]['assistant_reply'] = process_data_from_ai(result, question).get('assistant_reply', [])
-                        response['egov']['dialog']['all'] = result
+                            response['egov']["opendata"]['assistant_reply'] = process_data_from_ai(result, question).get('assistant_reply', [])
+                            response['egov']['opendata']['all'] = result
+                        except Exception as e:
+                            continue
 
                     elif data_type == 'NLA':
-                        result = []
-                        for query in param.get("keywords", []):
-                            parsing_result = parse_npa(query, begin_date, max_pages=max_pages)
-                            result.append(parsing_result)
+                        try:
+                            result = []
+                            for query in param.get("keywords", []):
+                                parsing_result = parse_npa(query, begin_date, max_pages=max_pages)
+                                result.append(parsing_result)
 
-                        response['egov']["npa"]['assistant_reply'] = process_data_from_ai(result, question).get('assistant_reply', [])
-                        response['egov']['dialog']['all'] = result
+                            response['egov']["npa"]['assistant_reply'] = process_data_from_ai(result, question).get('assistant_reply', [])
+                            response['egov']['npa']['all'] = result
+                        except Exception as e:
+                            continue
 
                     elif data_type == 'Budgets':
-                        result = []
-                        for query in param.get("keywords", []):
-                            parsing_result = parse_budget(query, max_pages=max_pages)
-                            for record in parsing_result:
-                                try:
-                                    result.append({
-                                        'link': record['detail_url'],
-                                        'summary': record['title'],
-                                        'relev_score': '0.9'
-                                    })
-                                except Exception:
-                                    continue
+                        try:
+                            result = []
+                            for query in param.get("keywords", []):
+                                parsing_result = parse_budget(query, max_pages=max_pages)
+                                for record in parsing_result:
+                                    try:
+                                        result.append({
+                                            'link': record['detail_url'],
+                                            'summary': record['title'],
+                                            'relev_score': '0.9'
+                                        })
+                                    except Exception:
+                                        continue
 
-                        response['egov']["budgets"]['assistant_reply'] = []
-                        response['egov']["budgets"]['all'] = result
+                            response['egov']["budgets"]['assistant_reply'] = []
+                            response['egov']["budgets"]['all'] = result
+                        except Exception as e:
+                            continue
 
             elif tool == 'Adilet':
                 response.setdefault('adilet', {})
                 for param in source.get("params", []):
                     data_type = param.get("type")
                     if data_type == 'NLA':
-                        result = []
-                        success_status = False
-                        retries = 0
-                        summary = {}
-                        while not success_status and retries < 5:
-                            for query in param.get("keywords", []):
-                                parsing_result = parse_adilet(query, begin_date, max_pages=max_pages)
-                                if parsing_result:
-                                    for record in parsing_result:
-                                        result.append({
-                                            'url': record['detail_url'],
-                                            'short_description': record['title']
-                                        })
+                        try:
+                            result = []
+                            success_status = False
+                            retries = 0
+                            summary = {}
+                            while not success_status and retries < 5:
+                                for query in param.get("keywords", []):
+                                    parsing_result = parse_adilet(query, begin_date, max_pages=max_pages)
+                                    if parsing_result:
+                                        for record in parsing_result:
+                                            result.append({
+                                                'url': record['detail_url'],
+                                                'short_description': record['title']
+                                            })
 
-                                summary = process_data_from_ai(result, question)
-                                success_status = summary['status'] == 'success'
-                                retries += 1
+                                    summary = process_data_from_ai(result, question)
+                                    success_status = summary['status'] == 'success'
+                                    retries += 1
 
-                        response['adilet']["npa"]['assistant_reply'] = summary.get('assistant_reply', [])
-                        response['adilet']["npa"]['all'] = result
+                            response['adilet']["npa"]['assistant_reply'] = summary.get('assistant_reply', [])
+                            response['adilet']["npa"]['all'] = result
+                        except Exception as e:
+                            continue
                     elif data_type == 'Research':
                         # Add your processing for Research if needed
                         pass
