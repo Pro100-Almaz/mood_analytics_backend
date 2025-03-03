@@ -1,7 +1,8 @@
 from celery import Celery
 import requests
 import os
-import ast
+import psycopg2
+import json
 from dotenv import load_dotenv
 from data_formating import format_egov_output
 
@@ -10,7 +11,7 @@ from parsing_scripts.dialog import parse_dialog
 from parsing_scripts.npa import parse_npa
 from parsing_scripts.budget import parse_budget
 from parsing_scripts.opendata import parse_opendata
-from openAI_search_texts import get_search_queries, process_search_queries
+from openAI_search_texts import get_search_queries, process_search_queries, analyze_opinion
 
 load_dotenv()
 
@@ -23,6 +24,15 @@ APIFY_COMMENTS_URL = "https://api.apify.com/v2/acts/apify~facebook-comments-scra
 
 # Configure Celery with a Redis broker (adjust if needed)
 celery_app = Celery('tasks', broker='redis://localhost:6379/0', backend='redis://localhost:6379/0')
+
+
+DB_CONFIG = {
+    "user": os.environ.get("PG_USER"),
+    "password": os.environ.get("PG_PASSWORD"),
+    "database": os.environ.get("PG_DB"),
+    "host": os.environ.get("PG_HOST"),
+    "port": os.environ.get("PG_PORT")
+}
 
 
 def process_data_from_ai(result, question):
@@ -188,8 +198,8 @@ def fetch_comments_for_posts_ig(posts):
     return all_comments
 
 
-@celery_app.task
-def process_search_task(question, full):
+@celery_app.task(bind=True)
+def process_search_task(self, question, full):
     begin_date = "01.01.2021"
     max_pages = 1 if full else 5
     data = get_search_queries(question)
@@ -345,7 +355,52 @@ def process_search_task(question, full):
             #     result = []
 
     except Exception as e:
-        # Optionally, you can log e and return an error object
         return {"error": str(e)}
 
-    return {"status": "success", "response": response}
+    try:
+        task_id = self.request.id
+
+        assistant_replies = []
+        if "egov" in response:
+            if "dialog" in response["egov"] and "assistant_reply" in response["egov"]["dialog"]:
+                assistant_replies.append({"egov_dialog": response["egov"]["dialog"]["assistant_reply"]})
+            if "opendata" in response["egov"] and "assistant_reply" in response["egov"]["opendata"]:
+                assistant_replies.append({"egov_opendata": response["egov"]["opendata"]["assistant_reply"]})
+            if "npa" in response["egov"] and "assistant_reply" in response["egov"]["npa"]:
+                assistant_replies.append({"egov_npa": response["egov"]["npa"]["assistant_reply"]})
+        if "adilet" in response:
+            if "npa" in response["adilet"] and "assistant_reply" in response["adilet"]["npa"]:
+                assistant_replies.append({"adilet_npa": response["adilet"]["npa"]["assistant_reply"]})
+        if "facebook" in response:
+            if "assistant_reply" in response["facebook"]:
+                assistant_replies.append({"facebook": response["facebook"]["assistant_reply"]})
+
+        conn = psycopg2.connect(**DB_CONFIG)
+        cursor = conn.cursor()
+
+        cursor.execute("""
+                CREATE TABLE IF NOT EXISTS search (
+                    id SERIAL PRIMARY KEY,
+                    celery_id VARCHAR(64) NOT NULL,
+                    question TEXT,
+                    assistant_replies JSONB,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+        conn.commit()
+
+        cursor.execute(
+            "INSERT INTO search (celery_id, question, assistant_replies) VALUES (%s, %s, %s)",
+            (task_id, question, json.dumps(assistant_replies))
+        )
+        conn.commit()
+
+        cursor.close()
+        conn.close()
+
+        opinion = json.loads(analyze_opinion(question, assistant_replies))
+    except Exception as e:
+        opinion = None
+
+
+    return {"status": "success", "response": response, "opinion": opinion}

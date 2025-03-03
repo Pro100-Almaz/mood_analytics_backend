@@ -34,3 +34,7 @@ def format_egov_output(data, query):
 
     return final_payload
 
+
+# def format_celery_data(data):
+#     for item in data.get('response'):
+

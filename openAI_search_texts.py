@@ -10,13 +10,14 @@ import json
 
 opinion_prompt = """
 Проанализируй общественное мнение по заданной теме.
-- Определи процентное соотношение положительных, отрицательных и нейтральных отзывов.
+- Определи соотношение положительных, отрицательных и нейтральных отзывов.
 - Тема анализа – это исходный вопрос, который я тебе передам.
 - Верни результат строго в виде JSON без лишних комментариев, по формату:
 {
-  "positive": <процент положительных отзывов>,
-  "negative": <процент отрицательных отзывов>,
-  "neutral": <процент нейтральных отзывов>
+  "positive": <количество положительных отзывов>,
+  "negative": <количество отрицательных отзывов>,
+  "neutral": <количество нейтральных отзывов>,
+  "main_opinion": <доминирующее мнение, в краце опиши картину>
 }
 """
 
@@ -176,16 +177,26 @@ def get_digest_data(opinion_list):
         return None
 
 
-def get_public_opinion(messages):
-    complete_prompt = f"\nSearch messages: {messages}\n" + opinion_prompt
+def analyze_opinion(question, assistant_replies):
+    responses_text = ""
+    for item in assistant_replies:
+        for key, value in item.items():
+            responses_text += f"{key}: {value}\n\n"
+
+    prompt = (
+        f"Тема: {question}\n\n"
+        f"Ответы {responses_text}\n\n"
+    )
+
     try:
         response = client.chat.completions.create(model="gpt-4",
-            messages=[
-                {"role": "system", "content": "Ты помощник для проведения исследования общественного мнения."},
-                {"role": "user", "content": complete_prompt}
-            ],
-            temperature=0.7,
-            max_tokens=1500
+              messages=[
+                  {"role": "system",
+                   "content": "Ты помощник для проведения исследования общественного мнения."},
+                  {"role": "user", "content": opinion_prompt + prompt}
+              ],
+              temperature=0.7,
+              max_tokens=1500
         )
         assistant_reply = response.choices[0].message.content
         return assistant_reply

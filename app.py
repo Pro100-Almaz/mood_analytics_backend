@@ -167,6 +167,34 @@ def least_endpoint():
         return {"error": str(e)}
 
 
+def get_all_assistant_replies(celery_id):
+    try:
+        conn = psycopg2.connect(**DB_CONFIG)
+        cursor = conn.cursor()
+
+        query = "SELECT assistant_replies FROM search WHERE celery_id = %s"
+        cursor.execute(query, (celery_id,))
+        row = cursor.fetchone()
+
+        cursor.close()
+        conn.close()
+
+        if row:
+            return row[0]
+        else:
+            return None
+    except Exception as e:
+        print("Error fetching assistant replies for celery_id {}: {}".format(celery_id, e))
+        return None
+
+
+@app.route('/get_opinion/<task_id>', methods=['GET'])
+def get_opinion(task_id):
+    get_assistant_reply = get_all_assistant_replies(task_id)
+
+    return jsonify(response)
+
+
 @app.route('/search_status/<task_id>', methods=['GET'])
 def search_status(task_id):
     from celery.result import AsyncResult
@@ -176,21 +204,10 @@ def search_status(task_id):
         response = {"state": task.state, "status": "Pending..."}
     elif task.state != "FAILURE":
         response = {"state": task.state, "result": task.result}
-        opinion = get_public_opinion(task.result)
-        response.update({"opinion": opinion})
     else:
         response = {"state": task.state, "status": str(task.info)}
 
     return jsonify(response)
-
-@app.route('/public_opinion', methods=['GET'])
-def public_opinion_endpoint():
-    topic = request.args.get('topic')
-    if not topic:
-        return jsonify({"error": "Missing 'topic' query parameter."}), 400
-
-    result = get_public_opinion(topic)
-    return jsonify(result)
 
 @app.route('/generate_digest/<task_id>', methods=['GET'])
 def generate_document(task_id):
@@ -245,7 +262,6 @@ def generate_document(task_id):
         return jsonify({"error": str(e)}), 500
 
 
-# Flask route to handle file uploads
 @app.route("/upload", methods=["POST"])
 def upload_file():
     if "file" not in request.files:
@@ -355,9 +371,6 @@ def fetch_document():
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500
-
-
-# @app.route("/digest_search", methods=["GET"])
 
 
 if __name__ == "__main__":
