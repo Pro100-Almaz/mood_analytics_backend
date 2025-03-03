@@ -98,7 +98,7 @@ json obj array name must be research
 """
 
 def get_search_queries(search_queries):
-    with open('test2.json', 'r') as file:
+    with open('test.json', 'r') as file:
         data = json.load(file)
 
     return data
