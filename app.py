@@ -147,7 +147,7 @@ def least_endpoint():
         cursor.execute("""
                 SELECT id, query, created_at
                 FROM history
-                ORDER BY created_at ASC
+                ORDER BY created_at DESC
                 LIMIT 10
             """)
 

@@ -168,8 +168,8 @@ def get_public_opinion(messages):
             temperature=0.7,
             max_tokens=1500
         )
-        print(assistant_reply)
         assistant_reply = response.choices[0].message.content
+        print(assistant_reply)
         return assistant_reply
     except Exception as e:
         return None
