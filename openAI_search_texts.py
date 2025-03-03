@@ -87,9 +87,6 @@ json obj array name must be research
 """
 
 def get_search_queries(search_queries):
-    with open('test.json', 'r') as f:
-        return json.load(f)
-
     additional_text = f"\nSearch Queries: {search_queries}\n"
     complete_prompt = prompt + additional_text
     # Make the API call to GPT-4
