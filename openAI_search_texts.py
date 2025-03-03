@@ -76,6 +76,19 @@ tool 4: FB - sentiment analysis tool.
 Ключевые слова должны быть как минимум 3 видов: 4 штуки: 1 слово. 3 штуки: 2 слова. 3 штуки: 3-4 слова.
 Без заморочек, это же ФБ!
 
+tool 5: Instagram - sentiment and content analysis tool
+Параметры: array of keyword phrases.
+
+Анализ постов, комментариев и хештегов в Instagram, связанных с темой исследования.
+В постах могут присутствовать как текстовые, так и визуальные элементы, но акцентируй внимание на текстовой составляющей.
+Если тема кажется узкой, подбери более популярные и обсуждаемые ключевики.
+Думай как обычный пользователь: формулируй проблему так, как это сделал бы гражданин, используя хештеги, сленговые выражения и краткие фразы.
+Ключевые слова должны быть как минимум 3 видов:
+4 штуки: 1 слово
+3 штуки: 2 слова
+3 штуки: 3-4 слова
+Без излишних сложностей, это же Instagram!
+
 Structure: array of objects: each object should have a tool name and an array of params (keywords / type) etc.
 
 ЗАДАНИЕ ПРИМЕР (ЧТОБЫ ТЫ ПОНЯЛ ЛОГИКУ):
@@ -140,9 +153,10 @@ def process_search_queries(user_message):
         )
 
         assistant_reply = response.choices[0].message.content
-        return assistant_reply
+        print(assistant_reply)
+        return {'status': 'success', 'assistant_reply': json.loads(assistant_reply)}
     except Exception as e:
-        return None
+        return {'status': 'error', 'error': str(e)}
 
 
 def get_digest_data(opinion_list):

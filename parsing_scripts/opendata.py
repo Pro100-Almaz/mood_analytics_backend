@@ -42,33 +42,36 @@ def parse_opendata(query_value, max_pages=1):
         "Accept-Language": "ru;q=0.5",
         "Connection": "keep-alive",
     })
-    while page <= max_pages:
-        params = {"text": query_value, 'page': page, "ok": "Искать"}
+    try:
+        while page <= max_pages:
+            params = {"text": query_value, 'page': page, "ok": "Искать"}
 
-        response = session.get(base_url + "/datasets/search", params=params)
-        if response.status_code != 200:
-            print(response.url)
-            print(f"Ошибка при загрузке страницы {page}: {response.status_code}")
-            break
-        soup = BeautifulSoup(response.text, 'lxml')
-        tab_pane = soup.find('div', class_='content-page')
-        if not tab_pane:
-            print(f"Родительский элемент 'content-page' не найден на странице {page}")
-            break
-        cards = tab_pane.find_all('div', class_='search-result-item')
-        if not cards:
-            print(f"На странице {page} нет карточек")
-            break
+            response = session.get(base_url + "/datasets/search", params=params)
+            if response.status_code != 200:
+                print(response.url)
+                print(f"Ошибка при загрузке страницы {page}: {response.status_code}")
+                break
+            soup = BeautifulSoup(response.text, 'lxml')
+            tab_pane = soup.find('div', class_='content-page')
+            if not tab_pane:
+                print(f"Родительский элемент 'content-page' не найден на странице {page}")
+                break
+            cards = tab_pane.find_all('div', class_='search-result-item')
+            if not cards:
+                print(f"На странице {page} нет карточек")
+                break
 
-        print(f"Парсинг страницы {page}...")
-        for card in cards:
-            readmore_link = card.find('h4').find('a')
-            if readmore_link and 'href' in readmore_link.attrs:
-                link = readmore_link['href']
-                print(f"Переход по ссылке: {link}")
-                detailed_info = get_detailed_data(f"{base_url}{link}", session)
-                if detailed_info:
-                    data.append(detailed_info)
-        page += 1
-        time.sleep(1)
-    return data
+            print(f"Парсинг страницы {page}...")
+            for card in cards:
+                readmore_link = card.find('h4').find('a')
+                if readmore_link and 'href' in readmore_link.attrs:
+                    link = readmore_link['href']
+                    print(f"Переход по ссылке: {link}")
+                    detailed_info = get_detailed_data(f"{base_url}{link}", session)
+                    if detailed_info:
+                        data.append(detailed_info)
+            page += 1
+            time.sleep(1)
+        return data
+    except Exception as e:
+        return None

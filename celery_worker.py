@@ -28,20 +28,33 @@ celery_app = Celery('tasks', broker='redis://localhost:6379/0', backend='redis:/
 def process_data_from_ai(result, question):
     format_egov_data = format_egov_output(result, question)
     user_message = format_egov_data["message_format"] + format_egov_data["prompt"]
-    shortened_prompt = " ".join(user_message.split())
-    shortened_prompt = shortened_prompt if len(shortened_prompt) <= 10000 else shortened_prompt[:10000]
-    response = process_search_queries(shortened_prompt)
 
-    print(response)
+    if len(user_message) > 5000:
+        response = {
+            'status': 'error',
+            'assistant_reply': []
+        }
+        partition = 0
+        while partition < len(user_message):
+            if partition + 5000 > len(user_message):
+                prompt = format_egov_data["message_format"] + format_egov_data["prompt"][partition:len(user_message)]
+            else:
+                prompt = format_egov_data["message_format"] + format_egov_data["prompt"][partition:partition + 5000]
 
-    try:
-        struct_data = ast.literal_eval(response)
-        return struct_data
-    except Exception as e:
-        return response
+            iter_response = process_search_queries(prompt)
+            if iter_response.get('status') == 'success':
+                response['status'] = 'success'
+                for data in iter_response['assistant_reply']:
+                    response['assistant_reply'].append(data)
+
+            partition += 5000
+    else:
+        response = process_search_queries(user_message)
+
+    return response
 
 
-def process_posts(keywords):
+def process_posts_fb(keywords):
     all_posts = []
 
     for keyword in keywords:
@@ -70,7 +83,75 @@ def process_posts(keywords):
     return all_posts
 
 
-def fetch_comments_for_posts(posts):
+def fetch_comments_for_posts_fb(posts):
+    all_comments = []
+
+    payload = {
+        "includeNestedComments": False,
+        "resultsLimit": 50,
+        "startUrls": [
+            {
+                "url": post.get('url'),
+            } for post in posts
+        ]
+    }
+
+    url = APIFY_COMMENTS_URL
+    if APIFY_TOKEN:
+        url += f"?token={APIFY_TOKEN}"
+
+    headers = {"Content-Type": "application/json"}
+    response = requests.post(url, json=payload, headers=headers)
+
+
+    if 200 <= response.status_code < 300:
+        data = response.json()
+        for comment in data:
+            all_comments.append(
+                {
+                    'url': comment.get('facebookUrl', ""),
+                    'message': comment.get('text', "")
+                }
+            )
+
+    if len(all_comments) == 0:
+        return posts
+
+    return all_comments
+
+
+def process_posts_ig():
+    all_posts = []
+
+    payload = {
+        "usernames": ['tengrinewskz', 'holanewskz', 'qumash_kz', 'kazpress.kz', 'astanovka98',
+                      'vastane.kz', 'qazpress.kz', 'astana_newtimes', 'taspanewskz', 'kris.p.media'],
+        "resultsLimit": 50,
+        "searchType": "posts",
+        "includeComments": True,
+        "includeTaggedPosts": False,
+        "includeStories": False,
+    }
+
+    url = APIFY_ACTOR_URL
+    if APIFY_TOKEN:
+        url += f"?token={APIFY_TOKEN}"
+
+    response = requests.post(url, json=payload, headers={"Content-Type": "application/json"})
+
+    if 200 <= response.status_code < 300:
+        data = response.json()
+        for post in data:
+            all_posts.append({
+                'post_id': post['post_id'],
+                'url': post['url'],
+                'message': post['message']
+            })
+
+    return all_posts
+
+
+def fetch_comments_for_posts_ig(posts):
     all_comments = []
 
     payload = {
@@ -109,7 +190,7 @@ def fetch_comments_for_posts(posts):
 
 @celery_app.task
 def process_search_task(question, full):
-    begin_date = "01.05.2021"
+    begin_date = "01.01.2021"
     max_pages = 1 if full else 5
     data = get_search_queries(question)
     response = {}
@@ -125,29 +206,39 @@ def process_search_task(question, full):
                 for param in source.get("params", []):
                     data_type = param.get("type")
                     if data_type == 'Dialog':
-                        try:
-                            result = []
+                        result = []
+                        success_status = False
+                        retries = 0
+                        summary = {}
+                        while not success_status and retries < 5:
                             for query in param.get("keywords", []):
                                 parsing_result = parse_dialog(query, begin_date, max_pages=max_pages)
-                                result.append(parsing_result)
-                            response['egov']["dialog"] = process_data_from_ai(result, question)
-                        except Exception as e:
-                            response['egov']["dialog"] = []
+                                if parsing_result:
+                                    for result in parsing_result:
+                                        if not any(item.get("url") == result.get("url") for item in result):
+                                            for data in parsing_result:
+                                                result.append(data)
+
+                            summary = process_data_from_ai(result, question)
+                            success_status = summary['status'] == 'success'
+                            retries += 1
+
+                        response['egov']['dialog']['assistant_reply'] = summary.get('assistant_reply', [])
+                        response['egov']['dialog']['all'] = result
 
                     elif data_type == 'Opendata':
                         result = []
                         for query in param.get("keywords", []):
-                            parsing_result = parse_opendata(query, max_pages=max_pages)
-                            for record in parsing_result:
-                                try:
+                            parsing_result = parse_opendata(query, max_pages=1)
+                            if parsing_result:
+                                for record in parsing_result:
                                     result.append({
-                                        'link': record['link'],
-                                        'summary': record['info']['descriptionKk'],
-                                        'relev_score': '0.9'
+                                        'url': record['link'],
+                                        'short_description': record['info']['descriptionRu']
                                     })
-                                except Exception:
-                                    continue
-                        response['egov']["opendata"] = result
+
+                        response['egov']["opendata"]['assistant_reply'] = process_data_from_ai(result, question).get('assistant_reply', [])
+                        response['egov']['dialog']['all'] = result
 
                     elif data_type == 'NLA':
                         result = []
@@ -155,7 +246,9 @@ def process_search_task(question, full):
                             parsing_result = parse_npa(query, begin_date, max_pages=max_pages)
                             result.append(parsing_result)
 
-                        response['egov']["npa"] = process_data_from_ai(result, question)
+                        response['egov']["npa"]['assistant_reply'] = process_data_from_ai(result, question).get('assistant_reply', [])
+                        response['egov']['dialog']['all'] = result
+
                     elif data_type == 'Budgets':
                         result = []
                         for query in param.get("keywords", []):
@@ -169,7 +262,9 @@ def process_search_task(question, full):
                                     })
                                 except Exception:
                                     continue
-                        response['egov']["budgets"] = result
+
+                        response['egov']["budgets"]['assistant_reply'] = []
+                        response['egov']["budgets"]['all'] = result
 
             elif tool == 'Adilet':
                 response.setdefault('adilet', {})
@@ -177,11 +272,25 @@ def process_search_task(question, full):
                     data_type = param.get("type")
                     if data_type == 'NLA':
                         result = []
-                        for query in param.get("keywords", []):
-                            parsing_result = parse_adilet(query, begin_date, max_pages=max_pages)
-                            result.append(parsing_result)
+                        success_status = False
+                        retries = 0
+                        summary = {}
+                        while not success_status and retries < 5:
+                            for query in param.get("keywords", []):
+                                parsing_result = parse_adilet(query, begin_date, max_pages=max_pages)
+                                if parsing_result:
+                                    for record in parsing_result:
+                                        result.append({
+                                            'url': record['detail_url'],
+                                            'short_description': record['title']
+                                        })
 
-                        response['adilet']["npa"] = process_data_from_ai(result, question)
+                                summary = process_data_from_ai(result, question)
+                                success_status = summary['status'] == 'success'
+                                retries += 1
+
+                        response['adilet']["npa"]['assistant_reply'] = summary.get('assistant_reply', [])
+                        response['adilet']["npa"]['all'] = result
                     elif data_type == 'Research':
                         # Add your processing for Research if needed
                         pass
@@ -216,11 +325,24 @@ def process_search_task(question, full):
                     response['web'] = {"citations": citations, "research": research}
 
             elif tool == 'FB':
+                result = []
                 keywords = source.get("params", [])
-                posts = process_posts(keywords)
-                comments_data = fetch_comments_for_posts(posts)
+                posts = process_posts_fb(keywords)
+                comments_data = fetch_comments_for_posts_fb(posts)
 
-                response['facebook'] = comments_data
+                for comment in comments_data:
+                    result.append({
+                        'url': comment.get('url'),
+                        'short_description': comment.get('message')
+                    })
+
+                summary = process_data_from_ai(result, question)
+
+                response['facebook']['assistant_reply'] = summary.get('assistant_reply', [])
+                response['facebook']['all'] = result
+
+            # elif tool == 'Instagram':
+            #     result = []
 
     except Exception as e:
         # Optionally, you can log e and return an error object
