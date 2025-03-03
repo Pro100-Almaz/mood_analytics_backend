@@ -129,5 +129,22 @@ def process_search_queries(user_message):
         return None
 
 
+def get_digest_data(opinion_list):
+    try:
+        response = client.chat.completions.create(model="gpt-4",
+            messages=[
+                {"role": "system", "content": "Ты помощник для проведения исследования."},
+                {"role": "user", "content": opinion_list}
+            ],
+            temperature=0.7,
+            max_tokens=1500
+        )
+
+        assistant_reply = response.choices[0].message.content
+        return assistant_reply
+    except Exception as e:
+        return None
+
+
 def get_public_opinion(messages):
     pass
