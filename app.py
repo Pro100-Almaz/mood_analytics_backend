@@ -8,7 +8,7 @@ from dotenv import load_dotenv
 from flask_cors import CORS
 from celery_worker import process_search_task
 from docxtpl import DocxTemplate
-
+from openAI_search_texts import get_public_opinion
 
 load_dotenv()
 app = Flask(__name__)
@@ -181,6 +181,14 @@ def search_status(task_id):
 
     return jsonify(response)
 
+@app.route('/public_opinion', methods=['GET'])
+def public_opinion_endpoint():
+    topic = request.args.get('topic')
+    if not topic:
+        return jsonify({"error": "Missing 'topic' query parameter."}), 400
+
+    result = get_public_opinion(topic)
+    return jsonify(result)
 
 @app.route('/generate_digest/<task_id>', methods=['GET'])
 def generate_document(task_id):
