@@ -188,11 +188,11 @@ def get_all_assistant_replies(celery_id):
         return None
 
 
-@app.route('/get_opinion/<task_id>', methods=['GET'])
-def get_opinion(task_id):
-    get_assistant_reply = get_all_assistant_replies(task_id)
-
-    return jsonify(response)
+# @app.route('/get_opinion/<task_id>', methods=['GET'])
+# def get_opinion(task_id):
+#     get_assistant_reply = get_all_assistant_replies(task_id)
+#
+#     return jsonify(response)
 
 
 @app.route('/search_status/<task_id>', methods=['GET'])
