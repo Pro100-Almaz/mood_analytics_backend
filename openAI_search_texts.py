@@ -8,12 +8,23 @@ load_dotenv()
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 import json
 
+opinion_prompt = """
+Проанализируй общественное мнение по заданной теме.
+- Определи процентное соотношение положительных, отрицательных и нейтральных отзывов.
+- Тема анализа – это исходный вопрос, который я тебе передам.
+- Верни результат строго в виде JSON без лишних комментариев, по формату:
+{
+  "positive": <процент положительных отзывов>,
+  "negative": <процент отрицательных отзывов>,
+  "neutral": <процент нейтральных отзывов>
+}
+"""
 
 prompt = """
 You are research helper for институт парламентаризма Казахстана. I give you prompt to research on and you choose ONLY RELEVANT tools and its parameters to be used by further agents. Return as JSON. if you decide to not to use any given type for a tool, still just pass a type with an empty null params array. Все ключевые запросы только на русском|предположим: Egov Budgets тебе не нужен, ты все равно пришлешь type: Budgets, keywords: []
 
-Tools set for AI RESEARSH: 
-1. Tool: EgovГосударственный портал Республики Казахстан, который хранит и предоставляет доступ к различным типам данных и услуг, связанных с государственным управлением и взаимодействием граждан с государственными органами  
+Tools set for AI RESEARSH:
+1. Tool: EgovГосударственный портал Республики Казахстан, который хранит и предоставляет доступ к различным типам данных и услуг, связанных с государственным управлением и взаимодействием граждан с государственными органами
    For tool 1 - Egov in parameters Provide an array of type + keywords objects.
    Основные Типы EGOV (включи их все в ответ, просто не обязательно ключевики если не нужно):
    - Открытый диалог (Type: Dialog)
@@ -68,7 +79,7 @@ tool 4: FB - sentiment analysis tool.
 Structure: array of objects: each object should have a tool name and an array of params (keywords / type) etc.
 
 ЗАДАНИЕ ПРИМЕР (ЧТОБЫ ТЫ ПОНЯЛ ЛОГИКУ):
-ЗАПРОС ИССЛЕДОВАНИЯ: основные проблемы в области ответственного обращения с животными 
+ЗАПРОС ИССЛЕДОВАНИЯ: основные проблемы в области ответственного обращения с животными
 (пример ключевых слов: вакцинация, стерилизация, отлов, оказание ветеринарной помощи животным, в т.ч. при увечье, учет животных, условия содержания животных в пунктах отлова, приемниках, питомниках, проведение эвтаназии, определение состояния здоровья животного, проведение на животных ветеринарных процедур и т.д.)
 
 Результаты, которые нужно найти с помощью твоего JSON:
@@ -130,4 +141,18 @@ def process_search_queries(user_message):
 
 
 def get_public_opinion(messages):
-    pass
+    complete_prompt = f"\nSearch messages: {messages}\n" + opinion_prompt + prompt
+    try:
+        response = client.chat.completions.create(model="gpt-4",
+            messages=[
+                {"role": "system", "content": "Ты помощник для проведения исследования общественного мнения."},
+                {"role": "user", "content": complete_prompt}
+            ],
+            temperature=0.7,
+            max_tokens=1500
+        )
+        print(assistant_reply)
+        assistant_reply = response.choices[0].message.content
+        return assistant_reply
+    except Exception as e:
+        return None
