@@ -1,17 +1,16 @@
 import re
-
 import requests
 from bs4 import BeautifulSoup, Comment
 import time
 
 base_url = "https://budget.egov.kz/application/search"
 
-
 def parse_budget(query_text, max_pages=1):
     page = 1
     data = []
+    total_parsed = 0  # Counter for parsed elements
 
-    while page <= max_pages:
+    while page <= max_pages and total_parsed < 5:
         params = {
             'querytext': query_text,
             'page': page,
@@ -29,7 +28,11 @@ def parse_budget(query_text, max_pages=1):
         if not h2_tags:
             print(f"На странице {page} нет тегов <h2> с ссылками.")
             break
+
         for h2 in h2_tags:
+            if total_parsed >= 5:
+                break
+
             link_tag = h2.find('a', href=True)
             if link_tag:
                 link = link_tag['href']
@@ -39,43 +42,16 @@ def parse_budget(query_text, max_pages=1):
                 detailed_info = parse_detail_page(full_link)
                 if detailed_info:
                     data.append(detailed_info)
+                    total_parsed += 1
 
         print(f"Парсинг страницы {page} завершен.")
+        if total_parsed >= 5:
+            break
+
         page += 1
         time.sleep(1)
 
     return data
-
-
-def parse_block(block, title, data):
-    data[title] = data.get(title, {"Подпрограммы": [],
-                                   "files": []})
-    table = block.find('tbody')
-    data[title]['common'] = parse_table(table)
-    sub_blocks = block.find_all(attrs={"id": re.compile(r"^tab-subprogram-REPORT")})
-    for sub_block in sub_blocks:
-        sub = sub_block.find('table')
-        for input_tag in sub.find_all(['input', 'a']):
-            input_tag.decompose()
-        for tag in sub.find_all(True):
-            tag.attrs.clear()
-        sub.attrs.clear()
-        for comment in sub.find_all(string=lambda text: isinstance(text, Comment)):
-            comment.extract()
-        data[title]["Подпрограммы"].append(f"{sub}".replace("\n", ""))
-
-    comment = block.find(string=lambda text: isinstance(text, Comment) and text.strip() == "filelist")
-    file_table = comment.next_sibling.next_sibling.find('tbody')
-    if file_table:
-        files = file_table.find_all('tr')
-        for file in files:
-            file_content = file.find_all('td')
-            data[title]["files"].append({
-                "title": file_content[1].text,
-                "date": file_content[2].text,
-                "link": "https://budget.egov.kz" + file_content[3].find('a')['href']
-            })
-
 
 def parse_detail_page(url):
     headers = {
@@ -87,7 +63,6 @@ def parse_detail_page(url):
         return None
 
     soup = BeautifulSoup(response.text, 'lxml')
-
     title_element = soup.find('h1')
     title = title_element.get_text(strip=True) if title_element else "Заголовок не найден"
 
@@ -114,6 +89,34 @@ def parse_detail_page(url):
         data["Сведения по пунктам плана государственных закупок"] = f"{egz_table}"
     return data
 
+def parse_block(block, title, data):
+    data[title] = data.get(title, {"Подпрограммы": [], "files": []})
+    table = block.find('tbody')
+    data[title]['common'] = parse_table(table)
+    sub_blocks = block.find_all(attrs={"id": re.compile(r"^tab-subprogram-REPORT")})
+    for sub_block in sub_blocks:
+        sub = sub_block.find('table')
+        for input_tag in sub.find_all(['input', 'a']):
+            input_tag.decompose()
+        for tag in sub.find_all(True):
+            tag.attrs.clear()
+        sub.attrs.clear()
+        for comment in sub.find_all(string=lambda text: isinstance(text, Comment)):
+            comment.extract()
+        data[title]["Подпрограммы"].append(f"{sub}".replace("\n", ""))
+
+    comment = block.find(string=lambda text: isinstance(text, Comment) and text.strip() == "filelist")
+    if comment:
+        file_table = comment.next_sibling.next_sibling.find('tbody')
+        if file_table:
+            files = file_table.find_all('tr')
+            for file in files:
+                file_content = file.find_all('td')
+                data[title]["files"].append({
+                    "title": file_content[1].text,
+                    "date": file_content[2].text,
+                    "link": "https://budget.egov.kz" + file_content[3].find('a')['href']
+                })
 
 def parse_table(table):
     parsed_data = {
@@ -172,5 +175,6 @@ def parse_table(table):
     parsed_data["Прямые показатели"] += "</tbody></table>"
     return parsed_data
 
-
-#parse_detail_page('https://budget.egov.kz/budgetprogram/budgetprogram?govAgencyId=3568&budgetId=2271590')
+# Example usage:
+# results = parse_budget("пример запроса", max_pages=3)
+# print(results)

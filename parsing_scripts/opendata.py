@@ -1,11 +1,12 @@
-import time
 import requests
 from bs4 import BeautifulSoup
+import json
+import time
 from urllib.parse import urlparse, parse_qs
 
 base_url = "https://data.egov.kz"
 API_KEY = "148a518f9f904eada3d3cbbbb607ef07"
-
+search_url = f"{base_url}/datasets/search"
 
 def get_detailed_data(link, session):
     try:
@@ -28,7 +29,6 @@ def get_detailed_data(link, session):
         print(f"Ошибка при получении данных: {e}")
         return {}
 
-
 def parse_opendata(query_value, max_pages=1):
     session = requests.Session()
     page = 1
@@ -43,10 +43,9 @@ def parse_opendata(query_value, max_pages=1):
         "Connection": "keep-alive",
     })
     try:
-        while page <= max_pages:
+        while page <= max_pages and len(data) < 5:
             params = {"text": query_value, 'page': page, "ok": "Искать"}
-
-            response = session.get(base_url + "/datasets/search", params=params)
+            response = session.get(search_url, params=params)
             if response.status_code != 200:
                 print(response.url)
                 print(f"Ошибка при загрузке страницы {page}: {response.status_code}")
@@ -63,6 +62,8 @@ def parse_opendata(query_value, max_pages=1):
 
             print(f"Парсинг страницы {page}...")
             for card in cards:
+                if len(data) >= 5:
+                    break
                 readmore_link = card.find('h4').find('a')
                 if readmore_link and 'href' in readmore_link.attrs:
                     link = readmore_link['href']
@@ -70,8 +71,17 @@ def parse_opendata(query_value, max_pages=1):
                     detailed_info = get_detailed_data(f"{base_url}{link}", session)
                     if detailed_info:
                         data.append(detailed_info)
+            if len(data) >= 5:
+                break
             page += 1
             time.sleep(1)
         return data
     except Exception as e:
+        print(f"Ошибка при получении страницы в поиске: {e}")
         return None
+    finally:
+        session.close()
+
+# Example usage:
+# results = parse_opendata("пример запроса", max_pages=3)
+# print(json.dumps(results, ensure_ascii=False, indent=2))

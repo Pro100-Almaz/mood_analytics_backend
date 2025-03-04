@@ -110,15 +110,22 @@ def parse_npa(search_value, begin_date=None, end_date=None, max_pages=1):
                         "type": all_tds[3].get_text(strip=True),
                         "detail_url": full_link,
                     })
-                    #print(f"Переход по ссылке: {full_link}")
-                    # detailed_info = get_detailed_info(full_link)
-                    # if detailed_info:
-                    #     data.append(detailed_info)
-
+                    # Stop if we've collected 5 elements
+                    if len(data) >= 5:
+                        break
+            # If 5 elements have been collected, stop processing further pages
+            if len(data) >= 5:
+                break
             page += 1
-            #time.sleep(1)
-        except:
-            print('Ошибка при получении страницы в поиске')
+            # Optionally, delay between pages:
+            # time.sleep(1)
+        except Exception as e:
+            print('Ошибка при получении страницы в поиске:', e)
+            break
         finally:
             session.close()
     return data
+
+# Example usage:
+# results = parse_npa("закон о бюджете", max_pages=3)
+# print(json.dumps(results, ensure_ascii=False, indent=2))
