@@ -229,7 +229,7 @@ def process_search_task(self, question, full):
                             success_status = False
                             retries = 0
                             summary = {}
-                            while not success_status and retries < 5:
+                            while not success_status and retries < 1:
                                 for query in param.get("keywords", []):
                                     parsing_result = parse_dialog(query, begin_date, max_pages=max_pages)
                                     if parsing_result:
@@ -281,7 +281,7 @@ def process_search_task(self, question, full):
                                 break
 
                         # response['egov']["npa"] = process_data_from_ai(result, question)
-                        response['egov']["npa"]['all'] = result
+                        response['egov']["npa"] = result
 
 
                     elif data_type == 'Budgets':
