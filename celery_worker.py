@@ -300,65 +300,65 @@ def process_search_task(self, question, full):
                     #
                     #     response['egov']["budgets"] = result
 
-            elif tool == 'Adilet':
-                response.setdefault('adilet', {})
-                for param in source.get("params", []):
-                    data_type = param.get("type")
-                    if data_type == 'NLA':
-                        try:
-                            result = []
-                            for query in param.get("keywords", []):
-                                parsing_result = parse_adilet(query, begin_date, max_pages=max_pages)
-                                if parsing_result:
-                                    if len(result) >= 1:
-                                        break
+            # elif tool == 'Adilet':
+            #     response.setdefault('adilet', {})
+            #     for param in source.get("params", []):
+            #         data_type = param.get("type")
+            #         if data_type == 'NLA':
+            #             try:
+            #                 result = []
+            #                 for query in param.get("keywords", []):
+            #                     parsing_result = parse_adilet(query, begin_date, max_pages=max_pages)
+            #                     if parsing_result:
+            #                         if len(result) >= 1:
+            #                             break
+            #
+            #                         for record in parsing_result:
+            #                             result.append({
+            #                                 'url': record['detail_url'],
+            #                                 'short_description': record['title']
+            #                             })
+            #
+            #                 # response['adilet']["npa"] = process_data_from_ai(result, question)
+            #                 response['adilet']["npa"] = result
+            #             except Exception as e:
+            #                 track_error(str(e), "adilet.nla", "Error")
+            #                 continue
+            #         elif data_type == 'Research':
+            #             # Add your processing for Research if needed
+            #             pass
 
-                                    for record in parsing_result:
-                                        result.append({
-                                            'url': record['detail_url'],
-                                            'short_description': record['title']
-                                        })
-
-                            # response['adilet']["npa"] = process_data_from_ai(result, question)
-                            response['adilet']["npa"] = result
-                        except Exception as e:
-                            track_error(str(e), "adilet.nla", "Error")
-                            continue
-                    elif data_type == 'Research':
-                        # Add your processing for Research if needed
-                        pass
-
-            elif tool == 'Web':
-                try:
-                    user_query = source.get("params", [])
-                    user_query_str = ", ".join(user_query)
-                    url = "https://api.perplexity.ai/chat/completions"
-                    headers = {
-                        "Authorization": f"Bearer {PERPLEXITY_API_KEY}",
-                        "Content-Type": "application/json"
-                    }
-                    payload = {
-                        "model": "llama-3.1-sonar-small-128k-online",
-                        "messages": [
-                            {
-                                "role": "system",
-                                "content": "Будьте точным, СВЕРХКРАТКИМ и лаконичным исследователем для правительства Казахстана. Отвечай все на русском! Исключи анализ НПА и законов."
-                            },
-                            {
-                                "role": "user",
-                                "content": f"Запрос: {user_query_str}. В начало своего ответа поставь мой первичный запрос без пояснений и потом твой ответ"
-                            }
-                        ]
-                    }
-                    url_response = requests.post(url, json=payload, headers=headers)
-                    if url_response.status_code == 200:
-                        json_data = url_response.json()
-                        citations = json_data.get("citations")
-                        research = json_data.get("choices", [{}])[0].get("message", {}).get("content")
-                        response['web'] = {"citations": citations, "research": research}
-                except Exception as e:
-                    track_error(str(e), "web", "Error")
-                    continue
+            # elif tool == 'Web':
+            #     try:
+            #         user_query = source.get("params", [])
+            #         user_query_str = ", ".join(user_query)
+            #         url = "https://api.perplexity.ai/chat/completions"
+            #         headers = {
+            #             "Authorization": f"Bearer {PERPLEXITY_API_KEY}",
+            #             "Content-Type": "application/json"
+            #         }
+            #         payload = {
+            #             "model": "llama-3.1-sonar-small-128k-online",
+            #             "messages": [
+            #                 {
+            #                     "role": "system",
+            #                     "content": "Будьте точным, СВЕРХКРАТКИМ и лаконичным исследователем для правительства Казахстана. Отвечай все на русском! Исключи анализ НПА и законов."
+            #                 },
+            #                 {
+            #                     "role": "user",
+            #                     "content": f"Запрос: {user_query_str}. В начало своего ответа поставь мой первичный запрос без пояснений и потом твой ответ"
+            #                 }
+            #             ]
+            #         }
+            #         url_response = requests.post(url, json=payload, headers=headers)
+            #         if url_response.status_code == 200:
+            #             json_data = url_response.json()
+            #             citations = json_data.get("citations")
+            #             research = json_data.get("choices", [{}])[0].get("message", {}).get("content")
+            #             response['web'] = {"citations": citations, "research": research}
+            #     except Exception as e:
+            #         track_error(str(e), "web", "Error")
+            #         continue
 
             elif tool == 'FB':
                 keywords = source.get("params", [])
