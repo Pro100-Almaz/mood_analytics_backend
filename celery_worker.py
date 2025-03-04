@@ -79,7 +79,7 @@ def fetch_comments_for_posts_fb(posts):
 
     payload = {
         "includeNestedComments": False,
-        "resultsLimit": 50,
+        "resultsLimit": 10,
         "startUrls": [
             {
                 "url": post.get('url'),
@@ -239,6 +239,9 @@ def process_search_task(self, question, full):
                                                 for data in parsing_result:
                                                     result.append(data)
 
+                                            if len(result) >= 20:
+                                                break
+
                                 summary = process_data_from_ai(result, question)
                                 success_status = summary['status'] == 'success'
                                 retries += 1
@@ -254,6 +257,8 @@ def process_search_task(self, question, full):
                         for query in param.get("keywords", []):
                             parsing_result = parse_opendata(query, max_pages=max_pages)
                             for record in parsing_result:
+                                if len(result) >= 20:
+                                    break
                                 try:
                                     result.append({
                                         'url': record['link'],
@@ -262,8 +267,8 @@ def process_search_task(self, question, full):
                                     })
                                 except Exception:
                                     continue
-                        # response['egov']["opendata"] = process_data_from_ai(result, question)
-                        response['egov']["opendata"] = result
+                        response['egov']["opendata"] = process_data_from_ai(result, question)
+                        response['egov']["opendata"]['all'] = result
 
 
                     elif data_type == 'NLA':
@@ -272,8 +277,11 @@ def process_search_task(self, question, full):
                             parsing_result = parse_npa(query, begin_date, max_pages=max_pages)
                             result.append(parsing_result)
 
-                        # response['egov']["npa"] = process_data_from_ai(result, question)
-                        response['egov']["npa"] = result
+                            if len(result) >= 20:
+                                break
+
+                        response['egov']["npa"] = process_data_from_ai(result, question)
+                        response['egov']["npa"]['all'] = result
 
 
                     elif data_type == 'Budgets':
@@ -302,6 +310,9 @@ def process_search_task(self, question, full):
                             for query in param.get("keywords", []):
                                 parsing_result = parse_adilet(query, begin_date, max_pages=max_pages)
                                 if parsing_result:
+                                    if len(result) >= 20:
+                                        break
+
                                     for record in parsing_result:
                                         result.append({
                                             'url': record['detail_url'],
@@ -309,6 +320,7 @@ def process_search_task(self, question, full):
                                         })
 
                             response['adilet']["npa"] = process_data_from_ai(result, question)
+                            response['adilet']["npa"]["all"] = result
                         except Exception as e:
                             track_error(str(e), "adilet.nla", "Error")
                             continue
