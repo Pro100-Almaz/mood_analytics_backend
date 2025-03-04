@@ -383,7 +383,7 @@ def process_search_task(self, question, full):
         cursor.close()
         conn.close()
 
-        opinion = json.loads(analyze_opinion(question, json.dumps(response)))
+        opinion = analyze_opinion(question, json.dumps(response))
     except Exception as e:
         opinion = None
 
