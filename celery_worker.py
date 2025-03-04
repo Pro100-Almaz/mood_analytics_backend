@@ -223,36 +223,36 @@ def process_search_task(self, question, full):
                 response.setdefault('egov', {})
                 for param in source.get("params", []):
                     data_type = param.get("type")
-                    if data_type == 'Dialog':
-                        try:
-                            result = []
-                            success_status = False
-                            retries = 0
-                            summary = {}
-                            while not success_status and retries < 1:
-                                for query in param.get("keywords", []):
-                                    parsing_result = parse_dialog(query, begin_date, max_pages=max_pages)
-                                    if parsing_result:
-                                        for record in parsing_result:
-                                            if not any(item.get("url") == record.get("url") for item in result):
-                                                print("Adding to result of egov dialog")
-                                                for data in parsing_result:
-                                                    result.append(data)
+                    # if data_type == 'Dialog':
+                    #     try:
+                    #         result = []
+                    #         success_status = False
+                    #         retries = 0
+                    #         summary = {}
+                    #         while not success_status and retries < 1:
+                    #             for query in param.get("keywords", []):
+                    #                 parsing_result = parse_dialog(query, begin_date, max_pages=max_pages)
+                    #                 if parsing_result:
+                    #                     for record in parsing_result:
+                    #                         if not any(item.get("url") == record.get("url") for item in result):
+                    #                             print("Adding to result of egov dialog")
+                    #                             for data in parsing_result:
+                    #                                 result.append(data)
+                    #
+                    #                         if len(result) >= 1:
+                    #                             break
+                    #
+                    #             summary = process_data_from_ai(result, question)
+                    #             success_status = summary['status'] == 'success'
+                    #             retries += 1
+                    #
+                    #         response['egov']['dialog'] = summary
+                    #         response['egov']['dialog']['all'] = result
+                    #     except Exception as e:
+                    #         response['egov']["dialog"] = []
 
-                                            if len(result) >= 1:
-                                                break
 
-                                summary = process_data_from_ai(result, question)
-                                success_status = summary['status'] == 'success'
-                                retries += 1
-
-                            response['egov']['dialog'] = summary
-                            response['egov']['dialog']['all'] = result
-                        except Exception as e:
-                            response['egov']["dialog"] = []
-
-
-                    elif data_type == 'Opendata':
+                    if data_type == 'Opendata':
                         result = []
                         for query in param.get("keywords", []):
                             parsing_result = parse_opendata(query, max_pages=max_pages)
