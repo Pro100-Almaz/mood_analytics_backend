@@ -38,30 +38,32 @@ DB_CONFIG = {
 def process_data_from_ai(result, question, type="Not defined"):
     format_egov_data = format_egov_output(result, question)
     user_message = format_egov_data["message_format"] + format_egov_data["prompt"]
+    if len(user_message) > 5000:
+        user_message = user_message[:5000]
 
     track_error(format_egov_data["prompt"], type, 'Info')
 
-    if len(user_message) > 5000:
-        response = {
-            'status': 'error',
-            'assistant_reply': []
-        }
-        partition = 0
-        while partition < len(user_message):
-            if partition + 5000 > len(user_message):
-                prompt = format_egov_data["message_format"] + format_egov_data["prompt"][partition:len(user_message)]
-            else:
-                prompt = format_egov_data["message_format"] + format_egov_data["prompt"][partition:partition + 5000]
-
-            iter_response = process_search_queries(prompt)
-            if iter_response.get('status') == 'success':
-                response['status'] = 'success'
-                for data in iter_response['assistant_reply']:
-                    response['assistant_reply'].append(data)
-
-            partition += 5000
-    else:
-        response = process_search_queries(user_message)
+    # if len(user_message) > 5000:
+    #     response = {
+    #         'status': 'error',
+    #         'assistant_reply': []
+    #     }
+    #     partition = 0
+    #     while partition < len(user_message):
+    #         if partition + 5000 > len(user_message):
+    #             prompt = format_egov_data["message_format"] + format_egov_data["prompt"][partition:len(user_message)]
+    #         else:
+    #             prompt = format_egov_data["message_format"] + format_egov_data["prompt"][partition:partition + 5000]
+    #
+    #         iter_response = process_search_queries(prompt)
+    #         if iter_response.get('status') == 'success':
+    #             response['status'] = 'success'
+    #             for data in iter_response['assistant_reply']:
+    #                 response['assistant_reply'].append(data)
+    #
+    #         partition += 5000
+    # else:
+    response = process_search_queries(user_message)
 
     track_error(response.get("status"), type, 'Info')
 
@@ -308,15 +310,16 @@ def process_search_task(self, question, full):
                             result = []
                             for query in param.get("keywords", []):
                                 parsing_result = parse_budget(query, max_pages=max_pages)
-                                for record in parsing_result:
-                                    try:
-                                        result.append({
-                                            'link': record['detail_url'],
-                                            'summary': record['title'],
-                                            'relev_score': '0.9'
-                                        })
-                                    except Exception:
-                                        continue
+                                if parsing_result:
+                                    for record in parsing_result:
+                                        try:
+                                            result.append({
+                                                'link': record['detail_url'],
+                                                'summary': record['title'],
+                                                'relev_score': '0.9'
+                                            })
+                                        except Exception:
+                                            continue
 
                             response['egov']["budgets"]['assistant_reply'] = []
                             response['egov']["budgets"]['all'] = result
@@ -331,22 +334,16 @@ def process_search_task(self, question, full):
                     if data_type == 'NLA':
                         try:
                             result = []
-                            success_status = False
-                            retries = 0
-                            summary = {}
-                            while not success_status and retries < 5:
-                                for query in param.get("keywords", []):
-                                    parsing_result = parse_adilet(query, begin_date, max_pages=max_pages)
-                                    if parsing_result:
-                                        for record in parsing_result:
-                                            result.append({
-                                                'url': record['detail_url'],
-                                                'short_description': record['title']
-                                            })
+                            for query in param.get("keywords", []):
+                                parsing_result = parse_adilet(query, begin_date, max_pages=max_pages)
+                                if parsing_result:
+                                    for record in parsing_result:
+                                        result.append({
+                                            'url': record['detail_url'],
+                                            'short_description': record['title']
+                                        })
 
-                                    summary = process_data_from_ai(result, question)
-                                    success_status = summary['status'] == 'success'
-                                    retries += 1
+                            summary = process_data_from_ai(result, question)
 
                             response['adilet']["npa"]['assistant_reply'] = summary.get('assistant_reply', [])
                             response['adilet']["npa"]['all'] = result
@@ -390,12 +387,13 @@ def process_search_task(self, question, full):
                     continue
 
             elif tool == 'FB':
-                try:
-                    result = []
-                    keywords = source.get("params", [])
-                    posts = process_posts_fb(keywords)
-                    comments_data = fetch_comments_for_posts_fb(posts)
+                result = []
+                keywords = source.get("params", [])
+                posts = process_posts_fb(keywords)
+                comments_data = fetch_comments_for_posts_fb(posts)
+                response['facebook']['all'] = result
 
+                try:
                     for comment in comments_data:
                         result.append({
                             'url': comment.get('url'),
@@ -403,13 +401,11 @@ def process_search_task(self, question, full):
                         })
 
                     summary = process_data_from_ai(result, question)
-
                     response['facebook']['assistant_reply'] = summary.get('assistant_reply', [])
-                    response['facebook']['all'] = result
+
                 except Exception as e:
                     track_error(str(e), "fb", "Error")
                     continue
-
             # elif tool == 'Instagram':
             #     result = []
 
