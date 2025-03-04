@@ -65,11 +65,12 @@ def process_posts_fb(keywords):
         if 200 <= response.status_code < 300:
             data = response.json()
             for post in data:
-                all_posts.append({
-                    'post_id': post.get('post_id'),
-                    'url': post.get('url'),
-                    'message': post.get('message')
-                })
+                if post:
+                    all_posts.append({
+                        'post_id': post.get('post_id'),
+                        'url': post.get('url'),
+                        'message': post.get('message')
+                    })
 
     return all_posts
 
@@ -100,13 +101,13 @@ def fetch_comments_for_posts_fb(posts):
         for comment in data:
             if len(all_comments) >= 20:
                 return all_comments
-
-            all_comments.append(
-                {
-                    'url': comment.get('facebookUrl', ""),
-                    'message': comment.get('text', "")
-                }
-            )
+            if comment:
+                all_comments.append(
+                    {
+                        'url': comment.get('facebookUrl', ""),
+                        'message': comment.get('text', "")
+                    }
+                )
 
     if len(all_comments) == 0:
         return posts
