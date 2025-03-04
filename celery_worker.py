@@ -239,7 +239,7 @@ def process_search_task(self, question, full):
                                                 for data in parsing_result:
                                                     result.append(data)
 
-                                            if len(result) >= 20:
+                                            if len(result) >= 1:
                                                 break
 
                                 summary = process_data_from_ai(result, question)
@@ -257,7 +257,7 @@ def process_search_task(self, question, full):
                         for query in param.get("keywords", []):
                             parsing_result = parse_opendata(query, max_pages=max_pages)
                             for record in parsing_result:
-                                if len(result) >= 20:
+                                if len(result) >= 1:
                                     break
                                 try:
                                     result.append({
@@ -277,7 +277,7 @@ def process_search_task(self, question, full):
                             parsing_result = parse_npa(query, begin_date, max_pages=max_pages)
                             result.append(parsing_result)
 
-                            if len(result) >= 20:
+                            if len(result) >= 1:
                                 break
 
                         # response['egov']["npa"] = process_data_from_ai(result, question)
@@ -310,7 +310,7 @@ def process_search_task(self, question, full):
                             for query in param.get("keywords", []):
                                 parsing_result = parse_adilet(query, begin_date, max_pages=max_pages)
                                 if parsing_result:
-                                    if len(result) >= 20:
+                                    if len(result) >= 1:
                                         break
 
                                     for record in parsing_result:
