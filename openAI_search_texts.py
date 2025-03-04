@@ -179,8 +179,13 @@ def get_digest_data(opinion_list):
 def analyze_opinion(question, assistant_replies):
     responses_text = ""
     for item in assistant_replies:
-        for key, value in item.items():
-            responses_text += f"{key}: {value}\n\n"
+        if item == 'web' or item == 'fb':
+            for key, value in item.items():
+                responses_text += f"{key}: {value}\n\n"
+        else:
+            for result in item:
+                for key, value in result.items():
+                    responses_text += f"{key}: {value}\n\n"
 
     prompt = (
         f"Тема: {question}\n\n"

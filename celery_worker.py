@@ -35,37 +35,12 @@ DB_CONFIG = {
 }
 
 
-def process_data_from_ai(result, question, type="Not defined"):
+def process_data_from_ai(result, question):
     format_egov_data = format_egov_output(result, question)
     user_message = format_egov_data["message_format"] + format_egov_data["prompt"]
-    if len(user_message) > 5000:
-        user_message = user_message[:5000]
-
-    track_error(format_egov_data["prompt"], type, 'Info')
-
-    # if len(user_message) > 5000:
-    #     response = {
-    #         'status': 'error',
-    #         'assistant_reply': []
-    #     }
-    #     partition = 0
-    #     while partition < len(user_message):
-    #         if partition + 5000 > len(user_message):
-    #             prompt = format_egov_data["message_format"] + format_egov_data["prompt"][partition:len(user_message)]
-    #         else:
-    #             prompt = format_egov_data["message_format"] + format_egov_data["prompt"][partition:partition + 5000]
-    #
-    #         iter_response = process_search_queries(prompt)
-    #         if iter_response.get('status') == 'success':
-    #             response['status'] = 'success'
-    #             for data in iter_response['assistant_reply']:
-    #                 response['assistant_reply'].append(data)
-    #
-    #         partition += 5000
-    # else:
-    response = process_search_queries(user_message)
-
-    track_error(response.get("status"), type, 'Info')
+    shortened_prompt = " ".join(user_message.split())
+    shortened_prompt = shortened_prompt if len(shortened_prompt) <= 10000 else shortened_prompt[:10000]
+    response = process_search_queries(shortened_prompt)
 
     return response
 
@@ -91,9 +66,9 @@ def process_posts_fb(keywords):
             data = response.json()
             for post in data:
                 all_posts.append({
-                    'post_id': post['post_id'],
-                    'url': post['url'],
-                    'message': post['message']
+                    'post_id': post.get('post_id'),
+                    'url': post.get('url'),
+                    'message': post.get('message')
                 })
 
     return all_posts
@@ -251,81 +226,54 @@ def process_search_task(self, question, full):
                     if data_type == 'Dialog':
                         try:
                             result = []
-                            success_status = False
-                            retries = 0
-                            summary = {}
-                            while not success_status and retries < 5:
-                                for query in param.get("keywords", []):
-                                    parsing_result = parse_dialog(query, begin_date, max_pages=max_pages)
-                                    if parsing_result:
-                                        for record in parsing_result:
-                                            if not any(item.get("url") == record.get("url") for item in result):
-                                                print("Adding to result of egov dialog")
-                                                for data in parsing_result:
-                                                    result.append(data)
-
-                                summary = process_data_from_ai(result, question)
-                                success_status = summary['status'] == 'success'
-                                retries += 1
-
-                            response['egov']['dialog']['assistant_reply'] = summary.get('assistant_reply', [])
-                            response['egov']['dialog']['all'] = result
+                            for query in param.get("keywords", []):
+                                parsing_result = parse_dialog(query, begin_date, max_pages=max_pages)
+                                result.append(parsing_result)
+                            response['egov']["dialog"] = process_data_from_ai(result, question)
                         except Exception as e:
-                            track_error(str(e), "egov.dialog", "Error")
-                            continue
+                            response['egov']["dialog"] = []
+
 
                     elif data_type == 'Opendata':
-                        try:
-                            result = []
-                            for query in param.get("keywords", []):
-                                parsing_result = parse_opendata(query, max_pages=1)
-                                if parsing_result:
-                                    for record in parsing_result:
-                                        result.append({
-                                            'url': record['link'],
-                                            'short_description': record['info']['descriptionRu']
-                                        })
+                        result = []
+                        for query in param.get("keywords", []):
+                            parsing_result = parse_opendata(query, max_pages=max_pages)
+                            for record in parsing_result:
+                                try:
+                                    result.append({
+                                        'url': record['link'],
+                                        'short_description': record['info']['descriptionKk'],
+                                        'relev_score': '0.9'
+                                    })
+                                except Exception:
+                                    continue
+                        response['egov']["opendata"] = process_data_from_ai(result, question)
 
-                            response['egov']["opendata"]['assistant_reply'] = process_data_from_ai(result, question).get('assistant_reply', [])
-                            response['egov']['opendata']['all'] = result
-                        except Exception as e:
-                            track_error(str(e), "egov.opendata", "Error")
-                            continue
 
                     elif data_type == 'NLA':
-                        try:
-                            result = []
-                            for query in param.get("keywords", []):
-                                parsing_result = parse_npa(query, begin_date, max_pages=max_pages)
-                                result.append(parsing_result)
+                        result = []
+                        for query in param.get("keywords", []):
+                            parsing_result = parse_npa(query, begin_date, max_pages=max_pages)
+                            result.append(parsing_result)
 
-                            response['egov']["npa"]['assistant_reply'] = process_data_from_ai(result, question).get('assistant_reply', [])
-                            response['egov']['npa']['all'] = result
-                        except Exception as e:
-                            track_error(str(e), "egov.nla", "Error")
-                            continue
+                        response['egov']["npa"] = process_data_from_ai(result, question)
+
 
                     elif data_type == 'Budgets':
-                        try:
-                            result = []
-                            for query in param.get("keywords", []):
-                                parsing_result = parse_budget(query, max_pages=max_pages)
-                                if parsing_result:
-                                    for record in parsing_result:
-                                        try:
-                                            result.append({
-                                                'link': record['detail_url'],
-                                                'summary': record['title'],
-                                                'relev_score': '0.9'
-                                            })
-                                        except Exception:
-                                            continue
+                        result = []
+                        for query in param.get("keywords", []):
+                            parsing_result = parse_budget(query, max_pages=max_pages)
+                            for record in parsing_result:
+                                try:
+                                    result.append({
+                                        'link': record['detail_url'],
+                                        'summary': record['title'],
+                                        'relev_score': '0.9'
+                                    })
+                                except Exception:
+                                    continue
 
-                            response['egov']["budgets"]['assistant_reply'] = []
-                            response['egov']["budgets"]['all'] = result
-                        except Exception as e:
-                            track_error(str(e), "egov.budgets", "Error")
-                            continue
+                        response['egov']["budgets"] = result
 
             elif tool == 'Adilet':
                 response.setdefault('adilet', {})
@@ -343,10 +291,7 @@ def process_search_task(self, question, full):
                                             'short_description': record['title']
                                         })
 
-                            summary = process_data_from_ai(result, question)
-
-                            response['adilet']["npa"]['assistant_reply'] = summary.get('assistant_reply', [])
-                            response['adilet']["npa"]['all'] = result
+                            response['adilet']["npa"] = process_data_from_ai(result, question)
                         except Exception as e:
                             track_error(str(e), "adilet.nla", "Error")
                             continue
@@ -387,48 +332,31 @@ def process_search_task(self, question, full):
                     continue
 
             elif tool == 'FB':
-                result = []
                 keywords = source.get("params", [])
                 posts = process_posts_fb(keywords)
                 comments_data = fetch_comments_for_posts_fb(posts)
-                response['facebook']['all'] = result
 
-                try:
-                    for comment in comments_data:
-                        result.append({
-                            'url': comment.get('url'),
-                            'short_description': comment.get('message')
-                        })
-
-                    summary = process_data_from_ai(result, question)
-                    response['facebook']['assistant_reply'] = summary.get('assistant_reply', [])
-
-                except Exception as e:
-                    track_error(str(e), "fb", "Error")
-                    continue
-            # elif tool == 'Instagram':
-            #     result = []
-
+                response['facebook'] = comments_data
     except Exception as e:
         return {"error": str(e)}
 
     try:
         task_id = self.request.id
 
-        assistant_replies = []
-        if "egov" in response:
-            if "dialog" in response["egov"] and "assistant_reply" in response["egov"]["dialog"]:
-                assistant_replies.append({"egov_dialog": response["egov"]["dialog"]["assistant_reply"]})
-            if "opendata" in response["egov"] and "assistant_reply" in response["egov"]["opendata"]:
-                assistant_replies.append({"egov_opendata": response["egov"]["opendata"]["assistant_reply"]})
-            if "npa" in response["egov"] and "assistant_reply" in response["egov"]["npa"]:
-                assistant_replies.append({"egov_npa": response["egov"]["npa"]["assistant_reply"]})
-        if "adilet" in response:
-            if "npa" in response["adilet"] and "assistant_reply" in response["adilet"]["npa"]:
-                assistant_replies.append({"adilet_npa": response["adilet"]["npa"]["assistant_reply"]})
-        if "facebook" in response:
-            if "assistant_reply" in response["facebook"]:
-                assistant_replies.append({"facebook": response["facebook"]["assistant_reply"]})
+        # assistant_replies = []
+        # if "egov" in response:
+        #     if "dialog" in response["egov"] and "assistant_reply" in response["egov"]["dialog"]:
+        #         assistant_replies.append({"egov_dialog": response["egov"]["dialog"]["assistant_reply"]})
+        #     if "opendata" in response["egov"] and "assistant_reply" in response["egov"]["opendata"]:
+        #         assistant_replies.append({"egov_opendata": response["egov"]["opendata"]["assistant_reply"]})
+        #     if "npa" in response["egov"] and "assistant_reply" in response["egov"]["npa"]:
+        #         assistant_replies.append({"egov_npa": response["egov"]["npa"]["assistant_reply"]})
+        # if "adilet" in response:
+        #     if "npa" in response["adilet"] and "assistant_reply" in response["adilet"]["npa"]:
+        #         assistant_replies.append({"adilet_npa": response["adilet"]["npa"]["assistant_reply"]})
+        # if "facebook" in response:
+        #     if "assistant_reply" in response["facebook"]:
+        #         assistant_replies.append({"facebook": response["facebook"]["assistant_reply"]})
 
         conn = psycopg2.connect(**DB_CONFIG)
         cursor = conn.cursor()
@@ -446,14 +374,14 @@ def process_search_task(self, question, full):
 
         cursor.execute(
             "INSERT INTO search (celery_id, question, assistant_replies) VALUES (%s, %s, %s)",
-            (task_id, question, json.dumps(assistant_replies))
+            (task_id, question, json.dumps(response))
         )
         conn.commit()
 
         cursor.close()
         conn.close()
 
-        opinion = json.loads(analyze_opinion(question, assistant_replies))
+        opinion = json.loads(analyze_opinion(question, response))
     except Exception as e:
         opinion = None
 
