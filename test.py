@@ -170,23 +170,23 @@ def process_search_task(question, full):
                     #         track_error(str(e), "egov.dialog", "Error")
                     #         continue
 
-                    if data_type == 'Opendata':
-                        try:
-                            result = []
-                            for query in param.get("keywords", []):
-                                parsing_result = parse_opendata(query, max_pages=1)
-                                if parsing_result:
-                                    for record in parsing_result:
-                                        result.append({
-                                            'url': record['link'],
-                                            'short_description': record['info']['descriptionRu']
-                                        })
-
-                            response['egov']["opendata"]['assistant_reply'] = process_data_from_ai(result, question).get('assistant_reply', [])
-                            response['egov']['opendata']['all'] = result
-                        except Exception as e:
-                            track_error(str(e), "egov.opendata", "Error")
-                            continue
+                    # if data_type == 'Opendata':
+                    #     try:
+                    #         result = []
+                    #         for query in param.get("keywords", []):
+                    #             parsing_result = parse_opendata(query, max_pages=1)
+                    #             if parsing_result:
+                    #                 for record in parsing_result:
+                    #                     result.append({
+                    #                         'url': record['link'],
+                    #                         'short_description': record['info']['descriptionRu']
+                    #                     })
+                    #
+                    #         response['egov']["opendata"]['assistant_reply'] = process_data_from_ai(result, question).get('assistant_reply', [])
+                    #         response['egov']['opendata']['all'] = result
+                    #     except Exception as e:
+                    #         track_error(str(e), "egov.opendata", "Error")
+                    #         continue
 
                     # elif data_type == 'NLA':
                     #     try:
@@ -222,38 +222,38 @@ def process_search_task(question, full):
                     #         track_error(str(e), "egov.budgets", "Error")
                     #         continue
 
-            # elif tool == 'Adilet':
-            #     response.setdefault('adilet', {})
-            #     for param in source.get("params", []):
-            #         data_type = param.get("type")
-            #         if data_type == 'NLA':
-            #             try:
-            #                 result = []
-            #                 success_status = False
-            #                 retries = 0
-            #                 summary = {}
-            #                 while not success_status and retries < 5:
-            #                     for query in param.get("keywords", []):
-            #                         parsing_result = parse_adilet(query, begin_date, max_pages=max_pages)
-            #                         if parsing_result:
-            #                             for record in parsing_result:
-            #                                 result.append({
-            #                                     'url': record['detail_url'],
-            #                                     'short_description': record['title']
-            #                                 })
-            #
-            #                         summary = process_data_from_ai(result, question)
-            #                         success_status = summary['status'] == 'success'
-            #                         retries += 1
-            #
-            #                 response['adilet']["npa"]['assistant_reply'] = summary.get('assistant_reply', [])
-            #                 response['adilet']["npa"]['all'] = result
-            #             except Exception as e:
-            #                 track_error(str(e), "adilet.nla", "Error")
-            #                 continue
-            #         elif data_type == 'Research':
-            #             # Add your processing for Research if needed
-            #             pass
+            elif tool == 'Adilet':
+                response.setdefault('adilet', {})
+                for param in source.get("params", []):
+                    data_type = param.get("type")
+                    if data_type == 'NLA':
+                        try:
+                            result = []
+                            success_status = False
+                            retries = 0
+                            summary = {}
+                            while not success_status and retries < 5:
+                                for query in param.get("keywords", []):
+                                    parsing_result = parse_adilet(query, begin_date, max_pages=max_pages)
+                                    if parsing_result:
+                                        for record in parsing_result:
+                                            result.append({
+                                                'url': record['detail_url'],
+                                                'short_description': record['title']
+                                            })
+
+                                    summary = process_data_from_ai(result, question)
+                                    success_status = summary['status'] == 'success'
+                                    retries += 1
+
+                            response['adilet']["npa"]['assistant_reply'] = summary.get('assistant_reply', [])
+                            response['adilet']["npa"]['all'] = result
+                        except Exception as e:
+                            track_error(str(e), "adilet.nla", "Error")
+                            continue
+                    elif data_type == 'Research':
+                        # Add your processing for Research if needed
+                        pass
             #
             # elif tool == 'Web':
             #     try:
