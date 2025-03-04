@@ -247,7 +247,8 @@ def process_search_task(self, question, full):
                                     })
                                 except Exception:
                                     continue
-                        response['egov']["opendata"] = process_data_from_ai(result, question)
+                        # response['egov']["opendata"] = process_data_from_ai(result, question)
+                        response['egov']["opendata"] = result
 
 
                     elif data_type == 'NLA':
@@ -256,7 +257,8 @@ def process_search_task(self, question, full):
                             parsing_result = parse_npa(query, begin_date, max_pages=max_pages)
                             result.append(parsing_result)
 
-                        response['egov']["npa"] = process_data_from_ai(result, question)
+                        # response['egov']["npa"] = process_data_from_ai(result, question)
+                        response['egov']["npa"] = result
 
 
                     elif data_type == 'Budgets':
