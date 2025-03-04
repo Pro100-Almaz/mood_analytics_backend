@@ -154,7 +154,6 @@ def process_search_queries(user_message):
         )
 
         assistant_reply = response.choices[0].message.content
-        print(assistant_reply)
         return {'status': 'success', 'assistant_reply': json.loads(assistant_reply)}
     except Exception as e:
         return {'status': 'error', 'error': str(e)}

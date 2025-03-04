@@ -35,9 +35,11 @@ DB_CONFIG = {
 }
 
 
-def process_data_from_ai(result, question):
+def process_data_from_ai(result, question, type="Not defined"):
     format_egov_data = format_egov_output(result, question)
     user_message = format_egov_data["message_format"] + format_egov_data["prompt"]
+
+    track_error(format_egov_data["prompt"], type, 'Info')
 
     if len(user_message) > 5000:
         response = {
@@ -60,6 +62,8 @@ def process_data_from_ai(result, question):
             partition += 5000
     else:
         response = process_search_queries(user_message)
+
+    track_error(response, type, 'Info')
 
     return response
 
@@ -252,8 +256,9 @@ def process_search_task(self, question, full):
                                 for query in param.get("keywords", []):
                                     parsing_result = parse_dialog(query, begin_date, max_pages=max_pages)
                                     if parsing_result:
-                                        for result in parsing_result:
-                                            if not any(item.get("url") == result.get("url") for item in result):
+                                        for record in parsing_result:
+                                            if not any(item.get("url") == record.get("url") for item in result):
+                                                print("Adding to result of egov dialog")
                                                 for data in parsing_result:
                                                     result.append(data)
 
