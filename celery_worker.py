@@ -84,7 +84,7 @@ def fetch_comments_for_posts_fb(posts):
         "startUrls": [
             {
                 "url": post.get('url'),
-            } for post in posts
+            } for post in posts[:2]
         ]
     }
 
@@ -101,6 +101,7 @@ def fetch_comments_for_posts_fb(posts):
         for comment in data:
             if len(all_comments) >= 20:
                 return all_comments
+
             if comment:
                 all_comments.append(
                     {
