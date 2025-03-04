@@ -226,10 +226,25 @@ def process_search_task(self, question, full):
                     if data_type == 'Dialog':
                         try:
                             result = []
-                            for query in param.get("keywords", []):
-                                parsing_result = parse_dialog(query, begin_date, max_pages=max_pages)
-                                result.append(parsing_result)
-                            response['egov']["dialog"] = process_data_from_ai(result, question)
+                            success_status = False
+                            retries = 0
+                            summary = {}
+                            while not success_status and retries < 5:
+                                for query in param.get("keywords", []):
+                                    parsing_result = parse_dialog(query, begin_date, max_pages=max_pages)
+                                    if parsing_result:
+                                        for record in parsing_result:
+                                            if not any(item.get("url") == record.get("url") for item in result):
+                                                print("Adding to result of egov dialog")
+                                                for data in parsing_result:
+                                                    result.append(data)
+
+                                summary = process_data_from_ai(result, question)
+                                success_status = summary['status'] == 'success'
+                                retries += 1
+
+                            response['egov']['dialog'] = summary
+                            response['egov']['dialog']['all'] = result
                         except Exception as e:
                             response['egov']["dialog"] = []
 
