@@ -252,53 +252,53 @@ def process_search_task(self, question, full):
                     #         response['egov']["dialog"] = []
 
 
-                    if data_type == 'Opendata':
-                        result = []
-                        for query in param.get("keywords", []):
-                            parsing_result = parse_opendata(query, max_pages=max_pages)
-                            for record in parsing_result:
-                                if len(result) >= 1:
-                                    break
-                                try:
-                                    result.append({
-                                        'url': record['link'],
-                                        'short_description': record['info']['descriptionKk'],
-                                        'relev_score': '0.9'
-                                    })
-                                except Exception:
-                                    continue
-                        response['egov']["opendata"] = process_data_from_ai(result, question)
-                        response['egov']["opendata"]['all'] = result
+                    # if data_type == 'Opendata':
+                    #     result = []
+                    #     for query in param.get("keywords", []):
+                    #         parsing_result = parse_opendata(query, max_pages=max_pages)
+                    #         for record in parsing_result:
+                    #             if len(result) >= 1:
+                    #                 break
+                    #             try:
+                    #                 result.append({
+                    #                     'url': record['link'],
+                    #                     'short_description': record['info']['descriptionKk'],
+                    #                     'relev_score': '0.9'
+                    #                 })
+                    #             except Exception:
+                    #                 continue
+                    #     response['egov']["opendata"] = process_data_from_ai(result, question)
+                    #     response['egov']["opendata"]['all'] = result
+
+                    #
+                    # elif data_type == 'NLA':
+                    #     result = []
+                    #     for query in param.get("keywords", []):
+                    #         parsing_result = parse_npa(query, begin_date, max_pages=max_pages)
+                    #         result.append(parsing_result)
+                    #
+                    #         if len(result) >= 1:
+                    #             break
+                    #
+                    #     # response['egov']["npa"] = process_data_from_ai(result, question)
+                    #     response['egov']["npa"] = result
 
 
-                    elif data_type == 'NLA':
-                        result = []
-                        for query in param.get("keywords", []):
-                            parsing_result = parse_npa(query, begin_date, max_pages=max_pages)
-                            result.append(parsing_result)
-
-                            if len(result) >= 1:
-                                break
-
-                        # response['egov']["npa"] = process_data_from_ai(result, question)
-                        response['egov']["npa"] = result
-
-
-                    elif data_type == 'Budgets':
-                        result = []
-                        for query in param.get("keywords", []):
-                            parsing_result = parse_budget(query, max_pages=max_pages)
-                            for record in parsing_result:
-                                try:
-                                    result.append({
-                                        'link': record['detail_url'],
-                                        'summary': record['title'],
-                                        'relev_score': '0.9'
-                                    })
-                                except Exception:
-                                    continue
-
-                        response['egov']["budgets"] = result
+                    # elif data_type == 'Budgets':
+                    #     result = []
+                    #     for query in param.get("keywords", []):
+                    #         parsing_result = parse_budget(query, max_pages=max_pages)
+                    #         for record in parsing_result:
+                    #             try:
+                    #                 result.append({
+                    #                     'link': record['detail_url'],
+                    #                     'summary': record['title'],
+                    #                     'relev_score': '0.9'
+                    #                 })
+                    #             except Exception:
+                    #                 continue
+                    #
+                    #     response['egov']["budgets"] = result
 
             elif tool == 'Adilet':
                 response.setdefault('adilet', {})
@@ -409,9 +409,10 @@ def process_search_task(self, question, full):
 
         cursor.close()
         conn.close()
-
+        track_error(json.dumps(response), "opinion", "Error")
         opinion = analyze_opinion(question, json.dumps(response))
     except Exception as e:
+        track_error(str(e), "opinion", "Error")
         opinion = None
 
 
