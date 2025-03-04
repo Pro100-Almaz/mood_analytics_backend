@@ -319,8 +319,8 @@ def process_search_task(self, question, full):
                                             'short_description': record['title']
                                         })
 
-                            response['adilet']["npa"] = process_data_from_ai(result, question)
-                            response['adilet']["npa"]["all"] = result
+                            # response['adilet']["npa"] = process_data_from_ai(result, question)
+                            response['adilet']["npa"] = result
                         except Exception as e:
                             track_error(str(e), "adilet.nla", "Error")
                             continue
