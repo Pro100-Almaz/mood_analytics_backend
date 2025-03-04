@@ -280,7 +280,7 @@ def process_search_task(self, question, full):
                             if len(result) >= 20:
                                 break
 
-                        response['egov']["npa"] = process_data_from_ai(result, question)
+                        # response['egov']["npa"] = process_data_from_ai(result, question)
                         response['egov']["npa"]['all'] = result
 
 
