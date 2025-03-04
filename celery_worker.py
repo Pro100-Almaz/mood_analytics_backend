@@ -98,6 +98,9 @@ def fetch_comments_for_posts_fb(posts):
     if 200 <= response.status_code < 300:
         data = response.json()
         for comment in data:
+            if len(all_comments) >= 20:
+                return all_comments
+
             all_comments.append(
                 {
                     'url': comment.get('facebookUrl', ""),
