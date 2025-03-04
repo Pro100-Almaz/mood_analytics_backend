@@ -63,7 +63,7 @@ def process_data_from_ai(result, question, type="Not defined"):
     else:
         response = process_search_queries(user_message)
 
-    track_error(response, type, 'Info')
+    track_error(response.get("status"), type, 'Info')
 
     return response
 
