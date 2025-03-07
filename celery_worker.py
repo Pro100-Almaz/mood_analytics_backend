@@ -1,10 +1,14 @@
+from enum import Enum
+
 from celery import Celery
 import requests
 import os
-import psycopg2
+from psycopg2 import sql, connect
+from psycopg2.extras import Json
 import json
 from dotenv import load_dotenv
 from data_formating import format_egov_output
+from apify_client import ApifyClient
 
 from parsing_scripts.adilet import parse_adilet
 from parsing_scripts.dialog import parse_dialog
@@ -15,8 +19,9 @@ from openAI_search_texts import get_search_queries, process_search_queries, anal
 
 load_dotenv()
 
-PERPLEXITY_API_KEY = os.environ.get("API_TOKEN")
+PERPLEXITY_API_KEY = os.environ.get("PERPLEXITY_API_TOKEN")
 APIFY_TOKEN = os.environ.get("APIFY_TOKEN")
+GOOGLE_API_KEY = os.environ.get("GOOGLE_API_KEY")
 
 APIFY_ACTOR_URL = "https://api.apify.com/v2/acts/danek~facebook-search-ppr/run-sync-get-dataset-items"
 APIFY_COMMENTS_URL = "https://api.apify.com/v2/acts/apify~facebook-comments-scraper/run-sync-get-dataset-items"
@@ -34,6 +39,11 @@ DB_CONFIG = {
     "port": os.environ.get("PG_PORT")
 }
 
+class ProcessStatus(Enum):
+    ERROR = 'Error'
+    SUCCESS = 'Success'
+    INFO = 'Info'
+
 
 def process_data_from_ai(result, question):
     format_egov_data = format_egov_output(result, question)
@@ -45,380 +55,479 @@ def process_data_from_ai(result, question):
     return response
 
 
-def process_posts_fb(keywords):
-    all_posts = []
-
-    for keyword in keywords:
-        payload = {
-            "location": "Almaty",
-            "max_posts": 20,
-            "query": keyword,
-            "search_type": "posts"
-        }
-
-        url = APIFY_ACTOR_URL
-        if APIFY_TOKEN:
-            url += f"?token={APIFY_TOKEN}"
-
-        response = requests.post(url, json=payload, headers={"Content-Type": "application/json"})
-
-        if 200 <= response.status_code < 300:
-            data = response.json()
-            for post in data:
-                if post:
-                    all_posts.append({
-                        'post_id': post.get('post_id'),
-                        'url': post.get('url'),
-                        'message': post.get('message')
-                    })
-
-    return all_posts
-
-
-def fetch_comments_for_posts_fb(posts):
-    all_comments = []
-
-    payload = {
-        "includeNestedComments": False,
-        "resultsLimit": 10,
-        "startUrls": [
-            {
-                "url": post.get('url'),
-            } for post in posts[:2]
-        ]
-    }
-
-    url = APIFY_COMMENTS_URL
-    if APIFY_TOKEN:
-        url += f"?token={APIFY_TOKEN}"
-
-    headers = {"Content-Type": "application/json"}
-    response = requests.post(url, json=payload, headers=headers)
-
-
-    if 200 <= response.status_code < 300:
-        data = response.json()
-        for comment in data:
-            if len(all_comments) >= 20:
-                return all_comments
-
-            if comment:
-                all_comments.append(
-                    {
-                        'url': comment.get('facebookUrl', ""),
-                        'message': comment.get('text', "")
-                    }
-                )
-
-    if len(all_comments) == 0:
-        return posts
-
-    return all_comments
-
-
-def process_posts_ig():
-    all_posts = []
-
-    payload = {
-        "usernames": ['tengrinewskz', 'holanewskz', 'qumash_kz', 'kazpress.kz', 'astanovka98',
-                      'vastane.kz', 'qazpress.kz', 'astana_newtimes', 'taspanewskz', 'kris.p.media'],
-        "resultsLimit": 50,
-        "searchType": "posts",
-        "includeComments": True,
-        "includeTaggedPosts": False,
-        "includeStories": False,
-    }
-
-    url = APIFY_ACTOR_URL
-    if APIFY_TOKEN:
-        url += f"?token={APIFY_TOKEN}"
-
-    response = requests.post(url, json=payload, headers={"Content-Type": "application/json"})
-
-    if 200 <= response.status_code < 300:
-        data = response.json()
-        for post in data:
-            all_posts.append({
-                'post_id': post['post_id'],
-                'url': post['url'],
-                'message': post['message']
-            })
-
-    return all_posts
-
-
-def fetch_comments_for_posts_ig(posts):
-    all_comments = []
-
-    payload = {
-        "includeNestedComments": False,
-        "resultsLimit": 50,
-        "startUrls": [
-            {
-                "url": post.get('url'),
-            } for post in posts
-        ]
-    }
-
-    url = APIFY_COMMENTS_URL
-    if APIFY_TOKEN:
-        url += f"?token={APIFY_TOKEN}"
-
-    headers = {"Content-Type": "application/json"}
-    response = requests.post(url, json=payload, headers=headers)
-
-
-    if 200 <= response.status_code < 300:
-        data = response.json()
-        for comment in data:
-            all_comments.append(
-                {
-                    'url': comment.get('facebookUrl', ""),
-                    'message': comment.get('text', "")
-                }
-            )
-
-    if len(all_comments) == 0:
-        return posts
-
-    return all_comments
-
-
 def track_error(error, step, log_level):
     try:
-        conn = psycopg2.connect(**DB_CONFIG)
-        cursor = conn.cursor()
+        with connect(**DB_CONFIG) as conn:
+            with conn.cursor() as cursor:
+                query = sql.SQL(
+                    "INSERT INTO {} (log_level, message, step) VALUES (%s, %s, %s)"
+                ).format(sql.Identifier("logs"))
 
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS logs (
-                id SERIAL PRIMARY KEY,
-                log_level VARCHAR(10) NOT NULL,
-                message TEXT,
-                step VARCHAR(100),
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )
-        """)
-        conn.commit()
-
-        cursor.execute(
-            "INSERT INTO logs (log_level, message, step) VALUES (%s, %s, %s)",
-            (log_level, error, step)
-        )
-        conn.commit()
-        cursor.close()
-        conn.close()
+                cursor.execute(query, (log_level.value, error, step))
+                conn.commit()
     except Exception as e:
         print("Error saving log entry:", str(e))
 
 
 @celery_app.task(bind=True)
-def process_search_task(self, question, full):
-    begin_date = "01.01.2021"
-    max_pages = 1 if full else 5
-    data = get_search_queries(question)
-    response = {}
+def process_search_task(self, question, full=False):
+    begin_date = "01.01.2019"
+    max_pages = 5 if full else 1
+    process_ids = []
 
     try:
-        for source in data.get("research", []):
+        data = get_search_queries(question)
+    except Exception as e:
+        track_error(str(e), 'get_search_queries', ProcessStatus.ERROR)
+        return {"status": "error", "response": "OpenAI Error while getting search keywords!"}
+
+    task_id = self.request.id
+    sources = data.get("sources", [])
+
+    if not sources:
+        track_error("Empty sources!", 'empty_search_result', ProcessStatus.ERROR)
+        return {"status": "error", "response": "OpenAI Error while getting search sources!"}
+
+    try:
+        for source in sources:
             tool = source.get("tool")
+
             if not tool:
+                track_error("Empty tool!", 'empty_tool_result', ProcessStatus.ERROR)
                 continue
 
-            if tool == 'Egov':
-                response.setdefault('egov', {})
-                for param in source.get("params", []):
+            if tool == "Egov":
+                params = source.get("params", {})
+
+                if not params:
+                    track_error("Empty params got Egov!", 'empty_params_result', ProcessStatus.ERROR)
+                    continue
+
+                for param in params:
                     data_type = param.get("type")
-                    # if data_type == 'Dialog':
-                    #     try:
-                    #         result = []
-                    #         success_status = False
-                    #         retries = 0
-                    #         summary = {}
-                    #         while not success_status and retries < 1:
-                    #             for query in param.get("keywords", []):
-                    #                 parsing_result = parse_dialog(query, begin_date, max_pages=max_pages)
-                    #                 if parsing_result:
-                    #                     for record in parsing_result:
-                    #                         if not any(item.get("url") == record.get("url") for item in result):
-                    #                             print("Adding to result of egov dialog")
-                    #                             for data in parsing_result:
-                    #                                 result.append(data)
-                    #
-                    #                         if len(result) >= 1:
-                    #                             break
-                    #
-                    #             summary = process_data_from_ai(result, question)
-                    #             success_status = summary['status'] == 'success'
-                    #             retries += 1
-                    #
-                    #         response['egov']['dialog'] = summary
-                    #         response['egov']['dialog']['all'] = result
-                    #     except Exception as e:
-                    #         response['egov']["dialog"] = []
+                    keywords = param.get("keywords", [])
 
+                    if data_type == "Dialog":
+                        task = process_egov_dialog.delay(question, keywords, task_id, begin_date, max_pages)
+                    elif data_type == "Opendata":
+                        task = process_egov_opendata.delay(question, keywords, task_id, begin_date, max_pages)
+                    elif data_type == "NLA":
+                        task = process_egov_nla.delay(question, keywords, task_id, begin_date, max_pages)
+                    elif data_type == "Budgets":
+                        task = process_egov_budgets.delay(question, keywords, task_id, begin_date, max_pages)
+                    else:
+                        continue
 
-                    # if data_type == 'Opendata':
-                    #     result = []
-                    #     for query in param.get("keywords", []):
-                    #         parsing_result = parse_opendata(query, max_pages=max_pages)
-                    #         for record in parsing_result:
-                    #             if len(result) >= 1:
-                    #                 break
-                    #             try:
-                    #                 result.append({
-                    #                     'url': record['link'],
-                    #                     'short_description': record['info']['descriptionKk'],
-                    #                     'relev_score': '0.9'
-                    #                 })
-                    #             except Exception:
-                    #                 continue
-                    #     response['egov']["opendata"] = process_data_from_ai(result, question)
-                    #     response['egov']["opendata"]['all'] = result
+                    process_ids.append({
+                        "process_type": data_type,
+                        "task_id": task.id
+                    })
 
-                    #
-                    # elif data_type == 'NLA':
-                    #     result = []
-                    #     for query in param.get("keywords", []):
-                    #         parsing_result = parse_npa(query, begin_date, max_pages=max_pages)
-                    #         result.append(parsing_result)
-                    #
-                    #         if len(result) >= 1:
-                    #             break
-                    #
-                    #     # response['egov']["npa"] = process_data_from_ai(result, question)
-                    #     response['egov']["npa"] = result
+            elif tool == "Adilet":
+                params = source.get("params", {})
 
+                if not params:
+                    track_error("Empty params got Adilet!", 'empty_params_result', ProcessStatus.ERROR)
+                    continue
 
-                    # elif data_type == 'Budgets':
-                    #     result = []
-                    #     for query in param.get("keywords", []):
-                    #         parsing_result = parse_budget(query, max_pages=max_pages)
-                    #         for record in parsing_result:
-                    #             try:
-                    #                 result.append({
-                    #                     'link': record['detail_url'],
-                    #                     'summary': record['title'],
-                    #                     'relev_score': '0.9'
-                    #                 })
-                    #             except Exception:
-                    #                 continue
-                    #
-                    #     response['egov']["budgets"] = result
+                for param in params:
+                    data_type = param.get("type")
+                    keywords = param.get("keywords", [])
 
-            # elif tool == 'Adilet':
-            #     response.setdefault('adilet', {})
-            #     for param in source.get("params", []):
-            #         data_type = param.get("type")
-            #         if data_type == 'NLA':
-            #             try:
-            #                 result = []
-            #                 for query in param.get("keywords", []):
-            #                     parsing_result = parse_adilet(query, begin_date, max_pages=max_pages)
-            #                     if parsing_result:
-            #                         if len(result) >= 1:
-            #                             break
-            #
-            #                         for record in parsing_result:
-            #                             result.append({
-            #                                 'url': record['detail_url'],
-            #                                 'short_description': record['title']
-            #                             })
-            #
-            #                 # response['adilet']["npa"] = process_data_from_ai(result, question)
-            #                 response['adilet']["npa"] = result
-            #             except Exception as e:
-            #                 track_error(str(e), "adilet.nla", "Error")
-            #                 continue
-            #         elif data_type == 'Research':
-            #             # Add your processing for Research if needed
-            #             pass
+                    if data_type == "NLA":
+                        task = process_adilet_nla.delay(question, keywords, task_id, begin_date, max_pages)
+                    else:
+                        continue
 
-            # elif tool == 'Web':
-            #     try:
-            #         user_query = source.get("params", [])
-            #         user_query_str = ", ".join(user_query)
-            #         url = "https://api.perplexity.ai/chat/completions"
-            #         headers = {
-            #             "Authorization": f"Bearer {PERPLEXITY_API_KEY}",
-            #             "Content-Type": "application/json"
-            #         }
-            #         payload = {
-            #             "model": "llama-3.1-sonar-small-128k-online",
-            #             "messages": [
-            #                 {
-            #                     "role": "system",
-            #                     "content": "Будьте точным, СВЕРХКРАТКИМ и лаконичным исследователем для правительства Казахстана. Отвечай все на русском! Исключи анализ НПА и законов."
-            #                 },
-            #                 {
-            #                     "role": "user",
-            #                     "content": f"Запрос: {user_query_str}. В начало своего ответа поставь мой первичный запрос без пояснений и потом твой ответ"
-            #                 }
-            #             ]
-            #         }
-            #         url_response = requests.post(url, json=payload, headers=headers)
-            #         if url_response.status_code == 200:
-            #             json_data = url_response.json()
-            #             citations = json_data.get("citations")
-            #             research = json_data.get("choices", [{}])[0].get("message", {}).get("content")
-            #             response['web'] = {"citations": citations, "research": research}
-            #     except Exception as e:
-            #         track_error(str(e), "web", "Error")
-            #         continue
+                    process_ids.append({
+                        "process_type": data_type,
+                        "task_id": task.id
+                    })
 
-            elif tool == 'FB':
-                keywords = source.get("params", [])
-                posts = process_posts_fb(keywords)
-                comments_data = fetch_comments_for_posts_fb(posts)
+            elif tool == "FB" or tool == "Instagram" or tool == "Web":
+                keywords = source.get("params", {})
 
-                response['facebook'] = comments_data
+                if not keywords:
+                    track_error(f"Empty params got {tool}!", 'empty_params_result', ProcessStatus.ERROR)
+                    continue
+
+                if tool == "FB":
+                    task = process_facebook.delay(question, keywords, task_id)
+                elif tool == "Instagram":
+                    task = process_instagram.delay(question, keywords, task_id)
+                elif tool == "Web":
+                    task = process_web.delay(question, keywords, task_id)
+                else:
+                    continue
+
+                process_ids.append({
+                    "process_type": tool,
+                    "task_id": task.id
+                })
+
+        return {"status": "success", "process_ids": process_ids}
+
     except Exception as e:
-        return {"error": str(e)}
+        track_error(str(e), 'source_iteration', ProcessStatus.ERROR)
+        return {"status": "error", "response": "OpenAI Error while processing search results!"}
 
+
+@celery_app.task(bind=True)
+def process_egov_dialog(self, question, keywords, task_id, begin_date, max_pages):
     try:
-        task_id = self.request.id
+        result = []
+        success_status = False
+        retries = 0
+        summary = {}
+        while not success_status and retries < 1:
+            for query in keywords:
+                parsing_result = parse_dialog(query, begin_date, max_pages=max_pages)
+                if parsing_result:
+                    for record in parsing_result:
+                        if not any(item.get("url") == record.get("url") for item in result):
+                            for data in parsing_result:
+                                result.append(data)
 
-        # assistant_replies = []
-        # if "egov" in response:
-        #     if "dialog" in response["egov"] and "assistant_reply" in response["egov"]["dialog"]:
-        #         assistant_replies.append({"egov_dialog": response["egov"]["dialog"]["assistant_reply"]})
-        #     if "opendata" in response["egov"] and "assistant_reply" in response["egov"]["opendata"]:
-        #         assistant_replies.append({"egov_opendata": response["egov"]["opendata"]["assistant_reply"]})
-        #     if "npa" in response["egov"] and "assistant_reply" in response["egov"]["npa"]:
-        #         assistant_replies.append({"egov_npa": response["egov"]["npa"]["assistant_reply"]})
-        # if "adilet" in response:
-        #     if "npa" in response["adilet"] and "assistant_reply" in response["adilet"]["npa"]:
-        #         assistant_replies.append({"adilet_npa": response["adilet"]["npa"]["assistant_reply"]})
-        # if "facebook" in response:
-        #     if "assistant_reply" in response["facebook"]:
-        #         assistant_replies.append({"facebook": response["facebook"]["assistant_reply"]})
+                        if len(result) >= 1:
+                            break
 
-        conn = psycopg2.connect(**DB_CONFIG)
-        cursor = conn.cursor()
+                if len(result) >= 1:
+                    break
 
-        cursor.execute("""
-                CREATE TABLE IF NOT EXISTS search (
-                    id SERIAL PRIMARY KEY,
-                    celery_id VARCHAR(64) NOT NULL,
-                    question TEXT,
-                    assistant_replies JSONB,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                )
-            """)
-        conn.commit()
+            summary = process_data_from_ai(result, question)
+            success_status = summary['status'] == 'success'
+            retries += 1
 
-        cursor.execute(
-            "INSERT INTO search (celery_id, question, assistant_replies) VALUES (%s, %s, %s)",
-            (task_id, question, json.dumps(response))
-        )
-        conn.commit()
+        if success_status:
+            summary["all"] = result
+            del summary["status"]
+            with connect(**DB_CONFIG) as conn:
+                with conn.cursor() as cursor:
+                    query = sql.SQL(
+                        "INSERT INTO {} (task_id, data) VALUES (%s, %s)"
+                    ).format(sql.Identifier("egov_dialog"))
 
-        cursor.close()
-        conn.close()
-        track_error(json.dumps(response), "opinion", "Error")
-        opinion = analyze_opinion(question, json.dumps(response))
+                    cursor.execute(query, (task_id, Json(summary.get('assistant_reply', {"Error": "Empty result!"}))))
+                    conn.commit()
+
+            return {"status": "success", "response": summary}
+
+        return {"status": "error"}
     except Exception as e:
-        track_error(str(e), "opinion", "Error")
-        opinion = None
+        track_error(str(e), 'egov_dialog', ProcessStatus.ERROR)
+        return {"status": "error"}
 
 
-    return {"status": "success", "response": response, "opinion": opinion}
+@celery_app.task(bind=True)
+def process_egov_opendata(self, question, keywords, task_id, begin_date, max_pages):
+    try:
+        result = []
+        for query in keywords:
+            parsing_result = parse_opendata(query, max_pages=max_pages)
+            for record in parsing_result:
+                result.append({
+                    'url': record['link'],
+                    'short_description': record['info']['descriptionKk'],
+                })
+
+                if len(result) >= 1:
+                    break
+
+            if len(result) >= 1:
+                break
+
+
+        summary = process_data_from_ai(result, question)
+
+        if summary['status'] == 'success':
+            summary["all"] = result
+            del summary["status"]
+            with connect(**DB_CONFIG) as conn:
+                with conn.cursor() as cursor:
+                    query = sql.SQL(
+                        "INSERT INTO {} (task_id, data) VALUES (%s, %s)"
+                    ).format(sql.Identifier("egov_opendata"))
+
+                    cursor.execute(query, (task_id, Json(summary.get('assistant_reply', {"Error": "Empty result!"}))))
+                    conn.commit()
+
+            return {"status": "success", "response": summary}
+
+        return {"status": "error"}
+
+    except Exception as e:
+        track_error(str(e), 'egov_opendata', ProcessStatus.ERROR)
+        return {"status": "error"}
+
+
+@celery_app.task(bind=True)
+def process_egov_nla(self, question, keywords, task_id, begin_date, max_pages):
+    try:
+        result = []
+        for query in keywords:
+            parsing_result = parse_npa(query, begin_date, max_pages=max_pages)
+            result.append(parsing_result)
+
+            if len(result) >= 1:
+                break
+
+        summary = process_data_from_ai(result, question)
+
+        if summary['status'] == 'success':
+            summary["all"] = result
+            del summary["status"]
+            with connect(**DB_CONFIG) as conn:
+                with conn.cursor() as cursor:
+                    query = sql.SQL(
+                        "INSERT INTO {} (task_id, data) VALUES (%s, %s)"
+                    ).format(sql.Identifier("egov_nla"))
+
+                    cursor.execute(query, (task_id, Json(summary.get('assistant_reply', {"Error": "Empty result!"}))))
+                    conn.commit()
+
+            return {"status": "success", "response": summary}
+
+        return {"status": "error"}
+
+    except Exception as e:
+        track_error(str(e), 'egov_nla', ProcessStatus.ERROR)
+        return {"status": "error"}
+
+
+@celery_app.task(bind=True)
+def process_egov_budgets(self, question, keywords, task_id, begin_date, max_pages):
+    try:
+        result = []
+        for query in keywords:
+            parsing_result = parse_npa(query, begin_date, max_pages=max_pages)
+            result.append(parsing_result)
+
+            if len(result) >= 1:
+                break
+
+        summary = process_data_from_ai(result, question)
+
+        if summary['status'] == 'success':
+            summary["all"] = result
+            del summary["status"]
+            with connect(**DB_CONFIG) as conn:
+                with conn.cursor() as cursor:
+                    query = sql.SQL(
+                        "INSERT INTO {} (task_id, data) VALUES (%s, %s)"
+                    ).format(sql.Identifier("egov_budget"))
+
+                    cursor.execute(query, (task_id, Json(summary.get('assistant_reply', {"Error": "Empty result!"}))))
+                    conn.commit()
+
+            return {"status": "success", "response": summary}
+
+        return {"status": "error"}
+
+    except Exception as e:
+        track_error(str(e), 'egov_budgets', ProcessStatus.ERROR)
+        return {"status": "error"}
+
+
+@celery_app.task(bind=True)
+def process_adilet_nla(self, question, keywords, task_id, begin_date, max_pages):
+    try:
+        result = []
+        for query in keywords:
+            parsing_result = parse_adilet(query, begin_date, max_pages=max_pages)
+            if parsing_result:
+                for record in parsing_result:
+                    result.append({
+                        'url': record['detail_url'],
+                        'short_description': record['title']
+                    })
+
+                    if len(result) >= 1:
+                        break
+
+            if len(result) >= 1:
+                break
+
+        summary = process_data_from_ai(result, question)
+
+        if summary['status'] == 'success':
+            summary["all"] = result
+            del summary["status"]
+            with connect(**DB_CONFIG) as conn:
+                with conn.cursor() as cursor:
+                    query = sql.SQL(
+                        "INSERT INTO {} (task_id, data) VALUES (%s, %s)"
+                    ).format(sql.Identifier("adilet"))
+
+                    cursor.execute(query, (task_id, Json(summary.get('assistant_reply', {"Error": "Empty result!"}))))
+                    conn.commit()
+
+            return {"status": "success", "response": summary}
+
+        return {"status": "error"}
+
+    except Exception as e:
+        track_error(str(e), 'adilet_nla', ProcessStatus.ERROR)
+        return {"status": "error"}
+
+
+@celery_app.task(bind=True)
+def process_web(self, question, keywords, task_id):
+    try:
+        user_query = keywords
+        user_query_str = ", ".join(user_query)
+        url = "https://api.perplexity.ai/chat/completions"
+        headers = {
+            "Authorization": f"Bearer {PERPLEXITY_API_KEY}",
+            "Content-Type": "application/json"
+        }
+        payload = {
+            "model": "llama-3.1-sonar-small-128k-online",
+            "messages": [
+                {
+                    "role": "system",
+                    "content": "Будьте точным, СВЕРХКРАТКИМ и лаконичным исследователем для правительства Казахстана. Отвечай все на русском! Исключи анализ НПА и законов."
+                },
+                {
+                    "role": "user",
+                    "content": f"Запрос: {user_query_str}. В начало своего ответа поставь мой первичный запрос без пояснений и потом твой ответ"
+                }
+            ]
+        }
+        url_response = requests.post(url, json=payload, headers=headers)
+        if url_response.status_code == 200:
+            json_data = url_response.json()
+            citations = json_data.get("citations")
+            research = json_data.get("choices", [{}])[0].get("message", {}).get("content")
+            summary = {"citations": citations, "research": research}
+
+            with connect(**DB_CONFIG) as conn:
+                with conn.cursor() as cursor:
+                    query = sql.SQL(
+                        "INSERT INTO {} (task_id, data) VALUES (%s, %s)"
+                    ).format(sql.Identifier("web"))
+
+                    cursor.execute(query,(task_id, Json(summary)))
+                    conn.commit()
+
+            return {"status": "success", "response": summary}
+
+        return {"status": "error"}
+    except Exception as e:
+        track_error(str(e), 'web', ProcessStatus.ERROR)
+        return {"status": "error"}
+
+
+@celery_app.task(bind=True)
+def process_facebook(self, question, keywords, task_id):
+    try:
+        search_query = keywords[0]
+        query = f"site:facebook.com {search_query}"
+        cx = '969efef82512648ba'
+
+        all_links = []
+        parsed_data = []
+
+        for start_index in range(1, 21, 10):
+            url = f"https://www.googleapis.com/customsearch/v1?q={query}&key={GOOGLE_API_KEY}&cx={cx}&start={start_index}"
+            response = requests.get(url)
+
+            if response.status_code != 200:
+                track_error('Not 200 status', 'facebook', ProcessStatus.ERROR)
+                continue
+
+            results = response.json()
+
+            for item in results.get('items', []):
+                all_links.append({"url": item['link']})
+
+        client = ApifyClient(APIFY_TOKEN)
+
+        run_input = {
+            "startUrls": all_links,
+            "resultsLimit": 50,
+            "includeNestedComments": False,
+            "viewOption": "RANKED_UNFILTERED",
+        }
+
+        run = client.actor("us5srxAYnsrkgUv2v").call(run_input=run_input)
+
+        for item in client.dataset(run["defaultDatasetId"]).iterate_items():
+            parsed_data.append({
+                "url": item.get('facebookUrl'),
+                "comment_url": item.get('commentUrl'),
+                "short_description": item.get('text')
+            })
+
+        with connect(**DB_CONFIG) as conn:
+            with conn.cursor() as cursor:
+                query = sql.SQL(
+                    "INSERT INTO {} (task_id, data) VALUES (%s, %s)"
+                ).format(sql.Identifier("facebook"))
+
+                cursor.execute(query, (task_id, Json(parsed_data)))
+                conn.commit()
+
+        return {"status": "success", "response": parsed_data}
+
+    except Exception as e:
+        track_error(str(e), 'web', ProcessStatus.ERROR)
+        return {"status": "error"}
+
+
+@celery_app.task(bind=True)
+def process_instagram(self, question, keywords, task_id):
+    try:
+        search_query = keywords[0]
+        query = f"site:instagram.com {search_query}"
+        cx = '969efef82512648ba'
+
+        all_links = []
+        parsed_data = []
+
+        for start_index in range(1, 21, 10):
+            url = f"https://www.googleapis.com/customsearch/v1?q={query}&key={GOOGLE_API_KEY}&cx={cx}&start={start_index}"
+
+            response = requests.get(url)
+
+            if response.status_code != 200:
+                track_error('Not 200 status', 'instagram', ProcessStatus.ERROR)
+                continue
+
+            results = response.json()
+
+            for item in results.get('items', []):
+                if item['link'] not in all_links:
+                    parts = item['link'].split('/')
+                    link = '/'.join(parts[:3]) + "/" + "/".join(parts[4:])
+                    all_links.append(link)
+
+        client = ApifyClient(APIFY_TOKEN)
+
+        run_input = {
+            "directUrls": all_links,
+            "resultsLimit": 20,
+        }
+
+        run = client.actor("SbK00X0JYCPblD2wp").call(run_input=run_input)
+
+        for item in client.dataset(run["defaultDatasetId"]).iterate_items():
+            if item.get('postUrl', None):
+                parsed_data.append({
+                    "url": item.get('postUrl'),
+                    "short_description": item.get('text')
+                })
+
+        with connect(**DB_CONFIG) as conn:
+            with conn.cursor() as cursor:
+                query = sql.SQL(
+                    "INSERT INTO {} (task_id, data) VALUES (%s, %s)"
+                ).format(sql.Identifier("instagram"))
+
+                cursor.execute(query, (task_id, Json(parsed_data)))
+                conn.commit()
+
+        return {"status": "success", "response": parsed_data}
+
+    except Exception as e:
+        track_error(str(e), 'instagram', ProcessStatus.ERROR)
+        return {"status": "error"}

@@ -1,3 +1,5 @@
+import re
+
 from parsing_scripts.dialog import *
 from celery_worker import *
 
@@ -64,38 +66,6 @@ result_list = []
 #         'short_description': comment.get('message')
 #     })
 
-
-all_posts = []
-APIFY_ACTOR_URL = "https://api.apify.com/v2/acts/apify~instagram-post-scraper/run-sync?token=apify_api_JlD1DxdITmx9pjL6j67F13R7zsHSN82f8xxQ"
-
-payload = {
-    "usernames": ['tengrinewskz', 'holanewskz', 'qumash_kz', 'kazpress.kz', 'astanovka98',
-                  'vastane.kz', 'qazpress.kz', 'astana_newtimes', 'taspanewskz', 'kris.p.media'],
-    "resultsLimit": 50,
-    "searchType": "posts",
-    "includeComments": True,
-    "includeTaggedPosts": False,
-    "includeStories": False,
-}
-
-url = APIFY_ACTOR_URL
-if APIFY_TOKEN:
-    url += f"?token={APIFY_TOKEN}"
-
-response = requests.post(url, json=payload, headers={"Content-Type": "application/json"})
-print(response.json())
-
-if 200 <= response.status_code < 300:
-    data = response.json()
-    print(data)
-    for post in data:
-        all_posts.append({
-            'post_id': post['post_id'],
-            'url': post['url'],
-            'message': post['message']
-        })
-
-
 # user_query = keywords
 # user_query_str = ", ".join(user_query)
 # url = "https://api.perplexity.ai/chat/completions"
@@ -127,4 +97,68 @@ if 200 <= response.status_code < 300:
 # result = process_data_from_ai(result_list, question)
 #
 # print(result)
+
+class ProcessStatus(Enum):
+    ERROR = 'Error'
+    SUCCESS = 'Success'
+    INFO = 'Info'
+
+def process_facebook_test(question, keywords, task_id):
+    try:
+        query = f"site:instagram.com Изменения в Водном кодексе Казахстана"
+        cx = '969efef82512648ba'
+        pattern = re.compile(r"(https?:\/\/(?:www\.)?instagram\.com\/(?:p|reel)\/([^/?#&]+)).*")
+
+        all_links = []
+        parsed_data = []
+
+        for start_index in range(1, 21, 10):
+            url = f"https://www.googleapis.com/customsearch/v1?q={query}&key={GOOGLE_API_KEY}&cx={cx}&start={start_index}"
+
+            response = requests.get(url)
+
+            if response.status_code != 200:
+                track_error('Not 200 status', 'instagram', ProcessStatus.ERROR)
+                continue
+
+            results = response.json()
+
+            for item in results.get('items', []):
+                if item['link'] not in all_links:
+                    parts = item['link'].split('/')
+                    link = '/'.join(parts[:3]) + "/" + "/".join(parts[4:])
+                    if pattern.match(link):
+                        all_links.append(link)
+
+        client = ApifyClient(APIFY_TOKEN)
+
+        run_input = {
+            "directUrls": all_links[:1],
+            "resultsLimit": 20,
+        }
+
+        run = client.actor("SbK00X0JYCPblD2wp").call(run_input=run_input)
+
+        for item in client.dataset(run["defaultDatasetId"]).iterate_items():
+            if item.get('postUrl', None):
+                parsed_data.append({
+                    "url": item.get('postUrl'),
+                    "short_description": item.get('text')
+                })
+
+        with connect(**DB_CONFIG) as conn:
+            with conn.cursor() as cursor:
+                query = sql.SQL(
+                    "INSERT INTO {} (task_id, data) VALUES (%s, %s)"
+                ).format(sql.Identifier("instagram"))
+
+                cursor.execute(query, (task_id, Json(parsed_data)))
+                conn.commit()
+
+
+    except Exception as e:
+        track_error(str(e), 'instagram', ProcessStatus.ERROR)
+        return {"status": "error"}
+
+process_facebook_test(question, keywords, 0)
 

@@ -128,12 +128,10 @@ def search_endpoint():
     if not question or len(question) <= 10:
         return jsonify({"error": "Too short request"}), 400
 
-    # Launch the Celery task (asynchronously)
     task = process_search_task.delay(question, full)
 
     save_request_to_postgres(question)
 
-    # Return immediately with the task ID so the frontend can poll for status
     return jsonify({"task_id": task.id}), 202
 
 
@@ -242,7 +240,6 @@ def search_status(task_id):
 #
 #     except Exception as e:
 #         return jsonify({"error": str(e)}), 500
-
 
 @app.route("/upload", methods=["POST"])
 def upload_file():
@@ -354,9 +351,6 @@ def fetch_document():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-
-if __name__ == "__main__":
-    app.run(debug=True)
 
 if __name__ == '__main__':
     print("Starting flask project!")
