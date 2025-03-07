@@ -151,9 +151,9 @@ def process_search_task(self, question, full=False):
                     track_error(f"Empty params got {tool}!", 'empty_params_result', ProcessStatus.ERROR)
                     continue
 
-                if tool == "FB":
+                if "FB" in tool:
                     task = process_facebook.delay(question, keywords, task_id)
-                elif tool == "Instagram":
+                elif "Instagram" in tool:
                     task = process_instagram.delay(question, keywords, task_id)
                 elif tool == "Web":
                     task = process_web.delay(question, keywords, task_id)
@@ -424,7 +424,9 @@ def process_web(self, question, keywords, task_id):
 @celery_app.task(bind=True)
 def process_facebook(self, question, keywords, task_id):
     try:
-        search_query = keywords.get('keyword_sentence')
+        search_query = keywords.get('keyword_sentence', None)
+        if not search_query:
+            search_query = keywords[0]
         query = f"site:facebook.com {search_query}"
         cx = '969efef82512648ba'
 
@@ -481,7 +483,9 @@ def process_facebook(self, question, keywords, task_id):
 @celery_app.task(bind=True)
 def process_instagram(self, question, keywords, task_id):
     try:
-        search_query = keywords.get('keyword_sentence')
+        search_query = keywords.get('keyword_sentence', None)
+        if not search_query:
+            search_query = keywords[0]
         query = f"site:instagram.com {search_query}"
         cx = '969efef82512648ba'
         pattern = re.compile(r"(https?:\/\/(?:www\.)?instagram\.com\/(?:p|reel)\/([^/?#&]+)).*")
