@@ -1,5 +1,5 @@
 from enum import Enum
-
+import re
 from celery import Celery
 import requests
 import os
@@ -198,8 +198,9 @@ def process_egov_dialog(self, question, keywords, task_id, begin_date, max_pages
             success_status = summary['status'] == 'success'
             retries += 1
 
+        summary["all"] = result
+
         if success_status:
-            summary["all"] = result
             del summary["status"]
             with connect(**DB_CONFIG) as conn:
                 with conn.cursor() as cursor:
@@ -237,24 +238,24 @@ def process_egov_opendata(self, question, keywords, task_id, begin_date, max_pag
                 break
 
 
-        summary = process_data_from_ai(result, question)
+        # summary = process_data_from_ai(result, question)
 
-        if summary['status'] == 'success':
-            summary["all"] = result
-            del summary["status"]
-            with connect(**DB_CONFIG) as conn:
-                with conn.cursor() as cursor:
-                    query = sql.SQL(
-                        "INSERT INTO {} (task_id, data) VALUES (%s, %s)"
-                    ).format(sql.Identifier("egov_opendata"))
+        # if summary['status'] == 'success':
+        #     summary["all"] = result
+        #     del summary["status"]
+        #     with connect(**DB_CONFIG) as conn:
+        #         with conn.cursor() as cursor:
+        #             query = sql.SQL(
+        #                 "INSERT INTO {} (task_id, data) VALUES (%s, %s)"
+        #             ).format(sql.Identifier("egov_opendata"))
+        #
+        #             cursor.execute(query, (task_id, Json(summary.get('assistant_reply', {"Error": "Empty result!"}))))
+        #             conn.commit()
+        #
+        #     return {"status": "success", "response": summary}
 
-                    cursor.execute(query, (task_id, Json(summary.get('assistant_reply', {"Error": "Empty result!"}))))
-                    conn.commit()
-
-            return {"status": "success", "response": summary}
-
-        return {"status": "error", "response": summary}
-
+        # return {"status": "error", "response": summary}
+        return {"status": "success", "response": result}
     except Exception as e:
         track_error(str(e), 'egov_opendata', ProcessStatus.ERROR)
         return {"status": "error"}
@@ -271,23 +272,24 @@ def process_egov_nla(self, question, keywords, task_id, begin_date, max_pages):
             if len(result) >= 1:
                 break
 
-        summary = process_data_from_ai(result, question)
-
-        if summary['status'] == 'success':
-            summary["all"] = result
-            del summary["status"]
-            with connect(**DB_CONFIG) as conn:
-                with conn.cursor() as cursor:
-                    query = sql.SQL(
-                        "INSERT INTO {} (task_id, data) VALUES (%s, %s)"
-                    ).format(sql.Identifier("egov_nla"))
-
-                    cursor.execute(query, (task_id, Json(summary.get('assistant_reply', {"Error": "Empty result!"}))))
-                    conn.commit()
-
-            return {"status": "success", "response": summary}
-
-        return {"status": "error", "response": summary}
+        # summary = process_data_from_ai(result, question)
+        #
+        # if summary['status'] == 'success':
+        #     summary["all"] = result
+        #     del summary["status"]
+        #     with connect(**DB_CONFIG) as conn:
+        #         with conn.cursor() as cursor:
+        #             query = sql.SQL(
+        #                 "INSERT INTO {} (task_id, data) VALUES (%s, %s)"
+        #             ).format(sql.Identifier("egov_nla"))
+        #
+        #             cursor.execute(query, (task_id, Json(summary.get('assistant_reply', {"Error": "Empty result!"}))))
+        #             conn.commit()
+        #
+        #     return {"status": "success", "response": summary}
+        #
+        # return {"status": "error", "response": summary}
+        return {"status": "success", "response": result}
 
     except Exception as e:
         track_error(str(e), 'egov_nla', ProcessStatus.ERROR)
@@ -347,23 +349,24 @@ def process_adilet_nla(self, question, keywords, task_id, begin_date, max_pages)
             if len(result) >= 1:
                 break
 
-        summary = process_data_from_ai(result, question)
-
-        if summary['status'] == 'success':
-            summary["all"] = result
-            del summary["status"]
-            with connect(**DB_CONFIG) as conn:
-                with conn.cursor() as cursor:
-                    query = sql.SQL(
-                        "INSERT INTO {} (task_id, data) VALUES (%s, %s)"
-                    ).format(sql.Identifier("adilet"))
-
-                    cursor.execute(query, (task_id, Json(summary.get('assistant_reply', {"Error": "Empty result!"}))))
-                    conn.commit()
-
-            return {"status": "success", "response": summary}
-
-        return {"status": "error", "response": summary}
+        # summary = process_data_from_ai(result, question)
+        #
+        # if summary['status'] == 'success':
+        #     summary["all"] = result
+        #     del summary["status"]
+        #     with connect(**DB_CONFIG) as conn:
+        #         with conn.cursor() as cursor:
+        #             query = sql.SQL(
+        #                 "INSERT INTO {} (task_id, data) VALUES (%s, %s)"
+        #             ).format(sql.Identifier("adilet"))
+        #
+        #             cursor.execute(query, (task_id, Json(summary.get('assistant_reply', {"Error": "Empty result!"}))))
+        #             conn.commit()
+        #
+        #     return {"status": "success", "response": summary}
+        #
+        # return {"status": "error", "response": summary}
+        return {"status": "success", "response": result}
 
     except Exception as e:
         track_error(str(e), 'adilet_nla', ProcessStatus.ERROR)
@@ -480,6 +483,7 @@ def process_instagram(self, question, keywords, task_id):
         search_query = keywords[0]
         query = f"site:instagram.com {search_query}"
         cx = '969efef82512648ba'
+        pattern = re.compile(r"(https?:\/\/(?:www\.)?instagram\.com\/(?:p|reel)\/([^/?#&]+)).*")
 
         all_links = []
         parsed_data = []
@@ -499,12 +503,13 @@ def process_instagram(self, question, keywords, task_id):
                 if item['link'] not in all_links:
                     parts = item['link'].split('/')
                     link = '/'.join(parts[:3]) + "/" + "/".join(parts[4:])
-                    all_links.append(link)
+                    if pattern.match(link):
+                        all_links.append(link)
 
         client = ApifyClient(APIFY_TOKEN)
 
         run_input = {
-            "directUrls": all_links,
+            "directUrls": all_links[:1],
             "resultsLimit": 20,
         }
 
