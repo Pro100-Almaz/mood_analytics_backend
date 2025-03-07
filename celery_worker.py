@@ -82,7 +82,7 @@ def process_search_task(self, question, full=False):
         return {"status": "error", "response": "OpenAI Error while getting search keywords!"}
 
     task_id = self.request.id
-    sources = data.get("sources", [])
+    sources = data.get("research", [])
 
     if not sources:
         track_error("Empty sources!", 'empty_search_result', ProcessStatus.ERROR)
