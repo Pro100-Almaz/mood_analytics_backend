@@ -188,10 +188,10 @@ def process_egov_dialog(self, question, keywords, task_id, begin_date, max_pages
                             for data in parsing_result:
                                 result.append(data)
 
-                        if len(result) >= 1:
+                        if len(result) >= 5:
                             break
 
-                if len(result) >= 1:
+                if len(result) >= 5:
                     break
 
             summary = process_data_from_ai(result, question)
@@ -231,10 +231,10 @@ def process_egov_opendata(self, question, keywords, task_id, begin_date, max_pag
                     'short_description': record['info']['descriptionKk'],
                 })
 
-                if len(result) >= 1:
+                if len(result) >= 5:
                     break
 
-            if len(result) >= 1:
+            if len(result) >= 5:
                 break
 
 
@@ -269,7 +269,7 @@ def process_egov_nla(self, question, keywords, task_id, begin_date, max_pages):
             parsing_result = parse_npa(query, begin_date, max_pages=max_pages)
             result.append(parsing_result)
 
-            if len(result) >= 1:
+            if len(result) >= 2:
                 break
 
         # summary = process_data_from_ai(result, question)
@@ -307,23 +307,24 @@ def process_egov_budgets(self, question, keywords, task_id, begin_date, max_page
             if len(result) >= 1:
                 break
 
-        summary = process_data_from_ai(result, question)
-
-        if summary['status'] == 'success':
-            summary["all"] = result
-            del summary["status"]
-            with connect(**DB_CONFIG) as conn:
-                with conn.cursor() as cursor:
-                    query = sql.SQL(
-                        "INSERT INTO {} (task_id, data) VALUES (%s, %s)"
-                    ).format(sql.Identifier("egov_budget"))
-
-                    cursor.execute(query, (task_id, Json(summary.get('assistant_reply', {"Error": "Empty result!"}))))
-                    conn.commit()
-
-            return {"status": "success", "response": summary}
-
-        return {"status": "error", "response": summary}
+        # summary = process_data_from_ai(result, question)
+        #
+        # if summary['status'] == 'success':
+        #     summary["all"] = result
+        #     del summary["status"]
+        #     with connect(**DB_CONFIG) as conn:
+        #         with conn.cursor() as cursor:
+        #             query = sql.SQL(
+        #                 "INSERT INTO {} (task_id, data) VALUES (%s, %s)"
+        #             ).format(sql.Identifier("egov_budget"))
+        #
+        #             cursor.execute(query, (task_id, Json(summary.get('assistant_reply', {"Error": "Empty result!"}))))
+        #             conn.commit()
+        #
+        #     return {"status": "success", "response": summary}
+        #
+        # return {"status": "error", "response": summary}
+        return {"status": "success", "response": result}
 
     except Exception as e:
         track_error(str(e), 'egov_budgets', ProcessStatus.ERROR)
@@ -343,10 +344,10 @@ def process_adilet_nla(self, question, keywords, task_id, begin_date, max_pages)
                         'short_description': record['title']
                     })
 
-                    if len(result) >= 1:
+                    if len(result) >= 5:
                         break
 
-            if len(result) >= 1:
+            if len(result) >= 5:
                 break
 
         # summary = process_data_from_ai(result, question)
