@@ -424,7 +424,7 @@ def process_web(self, question, keywords, task_id):
 @celery_app.task(bind=True)
 def process_facebook(self, question, keywords, task_id):
     try:
-        search_query = keywords[0]
+        search_query = keywords.get('keyword_sentence')
         query = f"site:facebook.com {search_query}"
         cx = '969efef82512648ba'
 
@@ -481,7 +481,7 @@ def process_facebook(self, question, keywords, task_id):
 @celery_app.task(bind=True)
 def process_instagram(self, question, keywords, task_id):
     try:
-        search_query = keywords[0]
+        search_query = keywords.get('keyword_sentence')
         query = f"site:instagram.com {search_query}"
         cx = '969efef82512648ba'
         pattern = re.compile(r"(https?:\/\/(?:www\.)?instagram\.com\/(?:p|reel)\/([^/?#&]+)).*")
