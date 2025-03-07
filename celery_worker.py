@@ -140,7 +140,7 @@ def process_search_task(self, question, full=False):
                         continue
 
                     process_ids.append({
-                        "process_type": data_type,
+                        "process_type": "Adilet",
                         "task_id": task.id
                     })
 
@@ -212,7 +212,7 @@ def process_egov_dialog(self, question, keywords, task_id, begin_date, max_pages
 
             return {"status": "success", "response": summary}
 
-        return {"status": "error"}
+        return {"status": "error", "response": summary}
     except Exception as e:
         track_error(str(e), 'egov_dialog', ProcessStatus.ERROR)
         return {"status": "error"}
@@ -253,7 +253,7 @@ def process_egov_opendata(self, question, keywords, task_id, begin_date, max_pag
 
             return {"status": "success", "response": summary}
 
-        return {"status": "error"}
+        return {"status": "error", "response": summary}
 
     except Exception as e:
         track_error(str(e), 'egov_opendata', ProcessStatus.ERROR)
@@ -287,7 +287,7 @@ def process_egov_nla(self, question, keywords, task_id, begin_date, max_pages):
 
             return {"status": "success", "response": summary}
 
-        return {"status": "error"}
+        return {"status": "error", "response": summary}
 
     except Exception as e:
         track_error(str(e), 'egov_nla', ProcessStatus.ERROR)
@@ -321,7 +321,7 @@ def process_egov_budgets(self, question, keywords, task_id, begin_date, max_page
 
             return {"status": "success", "response": summary}
 
-        return {"status": "error"}
+        return {"status": "error", "response": summary}
 
     except Exception as e:
         track_error(str(e), 'egov_budgets', ProcessStatus.ERROR)
@@ -363,7 +363,7 @@ def process_adilet_nla(self, question, keywords, task_id, begin_date, max_pages)
 
             return {"status": "success", "response": summary}
 
-        return {"status": "error"}
+        return {"status": "error", "response": summary}
 
     except Exception as e:
         track_error(str(e), 'adilet_nla', ProcessStatus.ERROR)
