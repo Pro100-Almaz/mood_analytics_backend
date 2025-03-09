@@ -103,62 +103,45 @@ class ProcessStatus(Enum):
     SUCCESS = 'Success'
     INFO = 'Info'
 
-def process_facebook_test(question, keywords, task_id):
+
+def process_egov_opendata(question, keywords, task_id, max_pages):
     try:
-        query = f"site:instagram.com Изменения в Водном кодексе Казахстана"
-        cx = '969efef82512648ba'
-        pattern = re.compile(r"(https?:\/\/(?:www\.)?instagram\.com\/(?:p|reel)\/([^/?#&]+)).*")
-
-        all_links = []
-        parsed_data = []
-
-        for start_index in range(1, 21, 10):
-            url = f"https://www.googleapis.com/customsearch/v1?q={query}&key={GOOGLE_API_KEY}&cx={cx}&start={start_index}"
-
-            response = requests.get(url)
-
-            if response.status_code != 200:
-                track_error('Not 200 status', 'instagram', ProcessStatus.ERROR)
-                continue
-
-            results = response.json()
-
-            for item in results.get('items', []):
-                if item['link'] not in all_links:
-                    parts = item['link'].split('/')
-                    link = '/'.join(parts[:3]) + "/" + "/".join(parts[4:])
-                    if pattern.match(link):
-                        all_links.append(link)
-
-        client = ApifyClient(APIFY_TOKEN)
-
-        run_input = {
-            "directUrls": all_links[:1],
-            "resultsLimit": 20,
-        }
-
-        run = client.actor("SbK00X0JYCPblD2wp").call(run_input=run_input)
-
-        for item in client.dataset(run["defaultDatasetId"]).iterate_items():
-            if item.get('postUrl', None):
-                parsed_data.append({
-                    "url": item.get('postUrl'),
-                    "short_description": item.get('text')
+        result = []
+        for query in keywords:
+            parsing_result = parse_opendata(query, max_pages=max_pages)
+            for record in parsing_result:
+                result.append({
+                    'url': record['link'],
+                    'short_description': record['info']['descriptionKk'],
                 })
 
-        with connect(**DB_CONFIG) as conn:
-            with conn.cursor() as cursor:
-                query = sql.SQL(
-                    "INSERT INTO {} (task_id, data) VALUES (%s, %s)"
-                ).format(sql.Identifier("instagram"))
+                if len(result) >= 5:
+                    break
 
-                cursor.execute(query, (task_id, Json(parsed_data)))
-                conn.commit()
+            if len(result) >= 5:
+                break
 
 
+        summary = process_data_from_ai(result, question)
+
+        if summary['status'] == 'success':
+            summary["all"] = result
+            del summary["status"]
+            with connect(**DB_CONFIG) as conn:
+                with conn.cursor() as cursor:
+                    query = sql.SQL(
+                        "INSERT INTO {} (task_id, data) VALUES (%s, %s)"
+                    ).format(sql.Identifier("egov_opendata"))
+
+                    cursor.execute(query, (task_id, Json(summary.get('assistant_reply', {"Error": "Empty result!"}))))
+                    conn.commit()
+
+            return {"status": "success", "response": summary}
+
+        return {"status": "error", "response": summary}
     except Exception as e:
-        track_error(str(e), 'instagram', ProcessStatus.ERROR)
+        track_error(str(e), 'egov_opendata', ProcessStatus.ERROR)
         return {"status": "error"}
 
-process_facebook_test(question, keywords, 0)
-
+res = process_egov_opendata(question, keywords, 1, 1)
+print(res)

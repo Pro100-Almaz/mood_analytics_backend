@@ -17,7 +17,7 @@ from parsing_scripts.budget import parse_budget
 from parsing_scripts.opendata import parse_opendata
 from openAI_search_texts import get_search_queries, process_search_queries, analyze_opinion
 from langchain.prompts import PromptTemplate
-from langchain_community.chat_models import ChatOpenAI
+from langchain_openai import ChatOpenAI
 
 load_dotenv()
 
@@ -69,9 +69,14 @@ def process_data_from_ai(result, question):
     shortened_prompt = shortened_prompt if len(shortened_prompt) <= 10000 else shortened_prompt[:10000]
 
     try:
-        response = model.predict(shortened_prompt)
+        response = model.invoke(shortened_prompt)
 
-        parsed_result = parser.parse(response)
+        if hasattr(response, "content"):
+            response_text = response.content
+        else:
+            response_text = response
+
+        parsed_result = parser.parse(response_text)
 
         return {"status": "success", "response": parsed_result}
     except Exception as error:

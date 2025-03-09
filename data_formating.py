@@ -1,6 +1,6 @@
 import json
-from langchain.schema import BaseOutputParser
-from pydantic import BaseModel, Field
+from langchain_core.output_parsers import BaseOutputParser
+from pydantic import BaseModel, Field, parse_obj_as
 from typing import List
 
 
@@ -16,7 +16,7 @@ class OutputParser(BaseOutputParser):
         try:
             parsed_data = json.loads(text)
             return [MainResponse(**item) for item in parsed_data]
-        except json.JSONDecodeError:
+        except Exception as e:
             return []
 
 
