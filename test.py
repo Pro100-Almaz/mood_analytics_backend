@@ -16,57 +16,6 @@ question = ("НАЙДИ СТАТЬИ, ПУБЛИКАЦИИ по закону О 
 begin_date = "01.05.2021"
 result_list = []
 
-## Egov -> Dialog
-# for query in keywords:
-#     parsing_result = parse_dialog(query, begin_date, max_pages=1)
-#     if parsing_result:
-#         for result in parsing_result:
-#             if not any(item.get("url") == result.get("url") for item in result_list):
-#                 for data in parsing_result:
-#                     result_list.append(data)
-
-## Egov -> Opendata
-# for keyword in keywords:
-#     parsing_result = parse_opendata(question, max_pages=1)
-#     if parsing_result:
-#         for record in parsing_result:
-#             result_list.append({
-#                 'url': record['link'],
-#                 'short_description': record['info']['descriptionRu']
-#             })
-
-
-## Egov -> NLA
-# for keyword in keywords:
-#     parsing_result = parse_npa(keyword, begin_date, max_pages=1)
-#     if parsing_result:
-#         for record in parsing_result:
-#             result_list.append({
-#                 'url': record['detail_url'],
-#                 'short_description': record['title']
-#             })
-
-## Adilet -> NLA
-# for keyword in keywords:
-#     parsing_result = parse_adilet(keyword, begin_date, max_pages=1)
-#     if parsing_result:
-#         for record in parsing_result:
-#             result_list.append({
-#                 'url': record['detail_url'],
-#                 'short_description': record['title']
-#             })
-
-
-# posts = process_posts(keywords)
-# comments_data = fetch_comments_for_posts(posts)
-#
-# for comment in comments_data:
-#     result_list.append({
-#         'url': comment.get('url'),
-#         'short_description': comment.get('message')
-#     })
-
-
 class ProcessStatus(Enum):
     ERROR = 'Error'
     SUCCESS = 'Success'
