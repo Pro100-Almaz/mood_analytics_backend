@@ -270,9 +270,9 @@ def process_egov_opendata(self, question, keywords, task_id, begin_date, max_pag
 
 
         summary = process_data_from_ai(result, question)
+        summary["all"] = result
 
         if summary['status'] == 'success':
-            summary["all"] = result
             del summary["status"]
             with connect(**DB_CONFIG) as conn:
                 with conn.cursor() as cursor:
@@ -303,9 +303,9 @@ def process_egov_nla(self, question, keywords, task_id, begin_date, max_pages):
                 break
 
         summary = process_data_from_ai(result, question)
+        summary["all"] = result
 
         if summary['status'] == 'success':
-            summary["all"] = result
             del summary["status"]
             with connect(**DB_CONFIG) as conn:
                 with conn.cursor() as cursor:
@@ -336,9 +336,9 @@ def process_egov_budgets(self, question, keywords, task_id, begin_date, max_page
                 break
 
         summary = process_data_from_ai(result, question)
+        summary["all"] = result
 
         if summary['status'] == 'success':
-            summary["all"] = result
             del summary["status"]
             with connect(**DB_CONFIG) as conn:
                 with conn.cursor() as cursor:
@@ -378,9 +378,9 @@ def process_adilet_nla(self, question, keywords, task_id, begin_date, max_pages)
                 break
 
         summary = process_data_from_ai(result, question)
+        summary["all"] = result
 
         if summary['status'] == 'success':
-            summary["all"] = result
             del summary["status"]
             with connect(**DB_CONFIG) as conn:
                 with conn.cursor() as cursor:
@@ -489,16 +489,23 @@ def process_facebook(self, question, keywords, task_id):
                 "short_description": item.get('text')
             })
 
-        with connect(**DB_CONFIG) as conn:
-            with conn.cursor() as cursor:
-                query = sql.SQL(
-                    "INSERT INTO {} (task_id, data) VALUES (%s, %s)"
-                ).format(sql.Identifier("facebook"))
+        summary = process_data_from_ai(parsed_data, question)
+        summary["all"] = parsed_data
 
-                cursor.execute(query, (task_id, Json(parsed_data)))
-                conn.commit()
+        if summary['status'] == 'success':
+            del summary["status"]
+            with connect(**DB_CONFIG) as conn:
+                with conn.cursor() as cursor:
+                    query = sql.SQL(
+                        "INSERT INTO {} (task_id, data) VALUES (%s, %s)"
+                    ).format(sql.Identifier("facebook"))
 
-        return {"status": "success", "response": parsed_data}
+                    cursor.execute(query, (task_id, Json(parsed_data)))
+                    conn.commit()
+
+            return {"status": "success", "response": summary}
+
+        return {"status": "error", "response": summary}
 
     except Exception as e:
         track_error(str(e), 'web', ProcessStatus.ERROR)
@@ -550,16 +557,23 @@ def process_instagram(self, question, keywords, task_id):
                     "short_description": item.get('text')
                 })
 
-        with connect(**DB_CONFIG) as conn:
-            with conn.cursor() as cursor:
-                query = sql.SQL(
-                    "INSERT INTO {} (task_id, data) VALUES (%s, %s)"
-                ).format(sql.Identifier("instagram"))
+        summary = process_data_from_ai(parsed_data, question)
+        summary["all"] = parsed_data
 
-                cursor.execute(query, (task_id, Json(parsed_data)))
-                conn.commit()
+        if summary['status'] == 'success':
+            del summary["status"]
+            with connect(**DB_CONFIG) as conn:
+                with conn.cursor() as cursor:
+                    query = sql.SQL(
+                        "INSERT INTO {} (task_id, data) VALUES (%s, %s)"
+                    ).format(sql.Identifier("instagram"))
 
-        return {"status": "success", "response": parsed_data}
+                    cursor.execute(query, (task_id, Json(parsed_data)))
+                    conn.commit()
+
+            return {"status": "success", "response": summary}
+
+        return {"status": "error", "response": summary}
 
     except Exception as e:
         track_error(str(e), 'instagram', ProcessStatus.ERROR)
