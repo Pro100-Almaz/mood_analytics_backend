@@ -7,7 +7,7 @@ from psycopg2 import sql, connect
 from psycopg2.extras import Json
 import json
 from dotenv import load_dotenv
-from data_formating import format_egov_output
+from data_formating import format_output, OutputParser
 from apify_client import ApifyClient
 
 from parsing_scripts.adilet import parse_adilet
@@ -16,12 +16,15 @@ from parsing_scripts.npa import parse_npa
 from parsing_scripts.budget import parse_budget
 from parsing_scripts.opendata import parse_opendata
 from openAI_search_texts import get_search_queries, process_search_queries, analyze_opinion
+from langchain.prompts import PromptTemplate
+from langchain_community.chat_models import ChatOpenAI
 
 load_dotenv()
 
 PERPLEXITY_API_KEY = os.environ.get("PERPLEXITY_API_TOKEN")
 APIFY_TOKEN = os.environ.get("APIFY_TOKEN")
 GOOGLE_API_KEY = os.environ.get("GOOGLE_API_KEY")
+OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
 
 APIFY_ACTOR_URL = "https://api.apify.com/v2/acts/danek~facebook-search-ppr/run-sync-get-dataset-items"
 APIFY_COMMENTS_URL = "https://api.apify.com/v2/acts/apify~facebook-comments-scraper/run-sync-get-dataset-items"
@@ -46,13 +49,33 @@ class ProcessStatus(Enum):
 
 
 def process_data_from_ai(result, question):
-    format_egov_data = format_egov_output(result, question)
-    user_message = format_egov_data["message_format"] + format_egov_data["prompt"]
-    shortened_prompt = " ".join(user_message.split())
-    shortened_prompt = shortened_prompt if len(shortened_prompt) <= 10000 else shortened_prompt[:10000]
-    response = process_search_queries(shortened_prompt)
+    formatted_data = format_output(result, question)
 
-    return response
+    prompt_template = PromptTemplate(
+        template="{message_format}\n\n{prompt}",
+        input_variables=["message_format", "prompt"]
+    )
+
+    model = ChatOpenAI(model_name="gpt-4", temperature=0)
+
+    parser = OutputParser()
+
+    prompt_text = prompt_template.format(
+        message_format=formatted_data["message_format"],
+        prompt=formatted_data["prompt"]
+    )
+
+    shortened_prompt = " ".join(prompt_text.split())
+    shortened_prompt = shortened_prompt if len(shortened_prompt) <= 10000 else shortened_prompt[:10000]
+
+    try:
+        response = model.predict(shortened_prompt)
+
+        parsed_result = parser.parse(response)
+
+        return {"status": "success", "response": parsed_result}
+    except Exception as error:
+        return {"status": "error", "response": error}
 
 
 def track_error(error, step, log_level):
@@ -238,24 +261,23 @@ def process_egov_opendata(self, question, keywords, task_id, begin_date, max_pag
                 break
 
 
-        # summary = process_data_from_ai(result, question)
+        summary = process_data_from_ai(result, question)
 
-        # if summary['status'] == 'success':
-        #     summary["all"] = result
-        #     del summary["status"]
-        #     with connect(**DB_CONFIG) as conn:
-        #         with conn.cursor() as cursor:
-        #             query = sql.SQL(
-        #                 "INSERT INTO {} (task_id, data) VALUES (%s, %s)"
-        #             ).format(sql.Identifier("egov_opendata"))
-        #
-        #             cursor.execute(query, (task_id, Json(summary.get('assistant_reply', {"Error": "Empty result!"}))))
-        #             conn.commit()
-        #
-        #     return {"status": "success", "response": summary}
+        if summary['status'] == 'success':
+            summary["all"] = result
+            del summary["status"]
+            with connect(**DB_CONFIG) as conn:
+                with conn.cursor() as cursor:
+                    query = sql.SQL(
+                        "INSERT INTO {} (task_id, data) VALUES (%s, %s)"
+                    ).format(sql.Identifier("egov_opendata"))
 
-        # return {"status": "error", "response": summary}
-        return {"status": "success", "response": result}
+                    cursor.execute(query, (task_id, Json(summary.get('assistant_reply', {"Error": "Empty result!"}))))
+                    conn.commit()
+
+            return {"status": "success", "response": summary}
+
+        return {"status": "error", "response": summary}
     except Exception as e:
         track_error(str(e), 'egov_opendata', ProcessStatus.ERROR)
         return {"status": "error"}
@@ -272,25 +294,23 @@ def process_egov_nla(self, question, keywords, task_id, begin_date, max_pages):
             if len(result) >= 2:
                 break
 
-        # summary = process_data_from_ai(result, question)
-        #
-        # if summary['status'] == 'success':
-        #     summary["all"] = result
-        #     del summary["status"]
-        #     with connect(**DB_CONFIG) as conn:
-        #         with conn.cursor() as cursor:
-        #             query = sql.SQL(
-        #                 "INSERT INTO {} (task_id, data) VALUES (%s, %s)"
-        #             ).format(sql.Identifier("egov_nla"))
-        #
-        #             cursor.execute(query, (task_id, Json(summary.get('assistant_reply', {"Error": "Empty result!"}))))
-        #             conn.commit()
-        #
-        #     return {"status": "success", "response": summary}
-        #
-        # return {"status": "error", "response": summary}
-        return {"status": "success", "response": result}
+        summary = process_data_from_ai(result, question)
 
+        if summary['status'] == 'success':
+            summary["all"] = result
+            del summary["status"]
+            with connect(**DB_CONFIG) as conn:
+                with conn.cursor() as cursor:
+                    query = sql.SQL(
+                        "INSERT INTO {} (task_id, data) VALUES (%s, %s)"
+                    ).format(sql.Identifier("egov_nla"))
+
+                    cursor.execute(query, (task_id, Json(summary.get('assistant_reply', {"Error": "Empty result!"}))))
+                    conn.commit()
+
+            return {"status": "success", "response": summary}
+
+        return {"status": "error", "response": summary}
     except Exception as e:
         track_error(str(e), 'egov_nla', ProcessStatus.ERROR)
         return {"status": "error"}
@@ -307,24 +327,23 @@ def process_egov_budgets(self, question, keywords, task_id, begin_date, max_page
             if len(result) >= 1:
                 break
 
-        # summary = process_data_from_ai(result, question)
-        #
-        # if summary['status'] == 'success':
-        #     summary["all"] = result
-        #     del summary["status"]
-        #     with connect(**DB_CONFIG) as conn:
-        #         with conn.cursor() as cursor:
-        #             query = sql.SQL(
-        #                 "INSERT INTO {} (task_id, data) VALUES (%s, %s)"
-        #             ).format(sql.Identifier("egov_budget"))
-        #
-        #             cursor.execute(query, (task_id, Json(summary.get('assistant_reply', {"Error": "Empty result!"}))))
-        #             conn.commit()
-        #
-        #     return {"status": "success", "response": summary}
-        #
-        # return {"status": "error", "response": summary}
-        return {"status": "success", "response": result}
+        summary = process_data_from_ai(result, question)
+
+        if summary['status'] == 'success':
+            summary["all"] = result
+            del summary["status"]
+            with connect(**DB_CONFIG) as conn:
+                with conn.cursor() as cursor:
+                    query = sql.SQL(
+                        "INSERT INTO {} (task_id, data) VALUES (%s, %s)"
+                    ).format(sql.Identifier("egov_budget"))
+
+                    cursor.execute(query, (task_id, Json(summary.get('assistant_reply', {"Error": "Empty result!"}))))
+                    conn.commit()
+
+            return {"status": "success", "response": summary}
+
+        return {"status": "error", "response": summary}
 
     except Exception as e:
         track_error(str(e), 'egov_budgets', ProcessStatus.ERROR)
@@ -350,24 +369,23 @@ def process_adilet_nla(self, question, keywords, task_id, begin_date, max_pages)
             if len(result) >= 5:
                 break
 
-        # summary = process_data_from_ai(result, question)
-        #
-        # if summary['status'] == 'success':
-        #     summary["all"] = result
-        #     del summary["status"]
-        #     with connect(**DB_CONFIG) as conn:
-        #         with conn.cursor() as cursor:
-        #             query = sql.SQL(
-        #                 "INSERT INTO {} (task_id, data) VALUES (%s, %s)"
-        #             ).format(sql.Identifier("adilet"))
-        #
-        #             cursor.execute(query, (task_id, Json(summary.get('assistant_reply', {"Error": "Empty result!"}))))
-        #             conn.commit()
-        #
-        #     return {"status": "success", "response": summary}
-        #
-        # return {"status": "error", "response": summary}
-        return {"status": "success", "response": result}
+        summary = process_data_from_ai(result, question)
+
+        if summary['status'] == 'success':
+            summary["all"] = result
+            del summary["status"]
+            with connect(**DB_CONFIG) as conn:
+                with conn.cursor() as cursor:
+                    query = sql.SQL(
+                        "INSERT INTO {} (task_id, data) VALUES (%s, %s)"
+                    ).format(sql.Identifier("adilet"))
+
+                    cursor.execute(query, (task_id, Json(summary.get('assistant_reply', {"Error": "Empty result!"}))))
+                    conn.commit()
+
+            return {"status": "success", "response": summary}
+
+        return {"status": "error", "response": summary}
 
     except Exception as e:
         track_error(str(e), 'adilet_nla', ProcessStatus.ERROR)

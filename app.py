@@ -206,40 +206,37 @@ def search_status(task_id):
 
     return jsonify(response)
 
-# @app.route('/generate_digest/<task_id>', methods=['GET'])
-# def generate_document(task_id):
-#     from celery.result import AsyncResult
-#     task = AsyncResult(task_id)
-#
-#     try:
-#
-#         doc = DocxTemplate("template.docx")
-#
-#         context = {
-#             "title": row[1],
-#             "date": row[2],
-#             "statistic": row[3],
-#             "description": row[4],
-#             "source": row[5],
-#             "articles_publication": row[6],
-#             "opinion": row[7],
-#             "dominating_opinion": row[8]
-#         }
-#         doc.render(context)
-#
-#         buffer = io.BytesIO()
-#         doc.save(buffer)
-#         buffer.seek(0)
-#
-#         return send_file(
-#             buffer,
-#             as_attachment=True,
-#             download_name="digest_report.docx",
-#             mimetype="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-#         )
-#
-#     except Exception as e:
-#         return jsonify({"error": str(e)}), 500
+@app.route('/generate_digest/<task_id>', methods=['GET'])
+def generate_document(task_id):
+    try:
+
+        doc = DocxTemplate("template.docx")
+
+        context = {
+            "title": row[1],
+            "date": row[2],
+            "statistic": row[3],
+            "description": row[4],
+            "source": row[5],
+            "articles_publication": row[6],
+            "opinion": row[7],
+            "dominating_opinion": row[8]
+        }
+        doc.render(context)
+
+        buffer = io.BytesIO()
+        doc.save(buffer)
+        buffer.seek(0)
+
+        return send_file(
+            buffer,
+            as_attachment=True,
+            download_name="digest_report.docx",
+            mimetype="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        )
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 @app.route("/upload", methods=["POST"])
 def upload_file():

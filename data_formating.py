@@ -1,7 +1,26 @@
 import json
+from langchain.schema import BaseOutputParser
+from pydantic import BaseModel, Field
+from typing import List
 
 
-def format_egov_output(data, query):
+class MainResponse(BaseModel):
+    link: str = Field(description="ссылка на данное обращение")
+    summary: str = Field(description="краткое описание данного обращения")
+    relev_score: float = Field(description="оценка вероятности соответствия данного обращения")
+    opinion: str = Field(description="степень положительности обращения: негативное, позитивное или нейтральное")
+
+
+class OutputParser(BaseOutputParser):
+    def parse(self, text: str) -> List[MainResponse]:
+        try:
+            parsed_data = json.loads(text)
+            return [MainResponse(**item) for item in parsed_data]
+        except json.JSONDecodeError:
+            return []
+
+
+def format_output(data, query):
     """
     Given a list of lists (each inner list containing dictionaries with 'url' and 'short_description'),
     convert them to a single formatted string.
@@ -33,8 +52,3 @@ def format_egov_output(data, query):
     }
 
     return final_payload
-
-
-# def format_celery_data(data):
-#     for item in data.get('response'):
-
