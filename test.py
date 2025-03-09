@@ -39,7 +39,6 @@ def process_egov_opendata(question, keywords, task_id, max_pages):
             if len(result) >= 5:
                 break
 
-
         summary = process_data_from_ai(result, question)
 
         if summary['status'] == 'success':
@@ -54,7 +53,7 @@ def process_egov_opendata(question, keywords, task_id, max_pages):
                     cursor.execute(query, (task_id, Json(summary.get('assistant_reply', {"Error": "Empty result!"}))))
                     conn.commit()
 
-            return {"status": "success", "response": summary}
+            return {"status": "success", "data": summary}
 
         return {"status": "error", "response": summary}
     except Exception as e:

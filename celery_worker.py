@@ -18,6 +18,7 @@ from parsing_scripts.opendata import parse_opendata
 from openAI_search_texts import get_search_queries, process_search_queries, analyze_opinion
 from langchain.prompts import PromptTemplate
 from langchain_openai import ChatOpenAI
+from langchain.output_parsers import OutputFixingParser
 
 load_dotenv()
 
@@ -60,6 +61,8 @@ def process_data_from_ai(result, question):
 
     parser = OutputParser()
 
+    new_parser = OutputFixingParser.from_llm(parser=parser, llm=model)
+
     prompt_text = prompt_template.format(
         message_format=formatted_data["message_format"],
         prompt=formatted_data["prompt"]
@@ -76,9 +79,9 @@ def process_data_from_ai(result, question):
         else:
             response_text = response
 
-        parsed_result = parser.parse(response_text)
+        parsed_result = new_parser.parse(response_text)
 
-        return {"status": "success", "response": parsed_result}
+        return {"status": "success", "ai_response": parsed_result}
     except Exception as error:
         return {"status": "error", "response": error}
 

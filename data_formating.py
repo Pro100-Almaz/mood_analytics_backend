@@ -10,19 +10,21 @@ class MainResponse(BaseModel):
     relev_score: float = Field(description="оценка вероятности соответствия данного обращения")
     opinion: str = Field(description="степень положительности обращения: негативное, позитивное или нейтральное")
 
+    def to_dict(self):
+        return {
+            "link": self.link,
+            "summary": self.summary,
+            "opinion": self.opinion,
+            "relev_score": self.relev_score
+        }
+
 
 class OutputParser(BaseOutputParser):
     def parse(self, text: str) -> List[MainResponse]:
         try:
-            print(text)
             parsed_data = json.loads(text)
-            print(parsed_data)
-            return [MainResponse(**item) for item in parsed_data]
+            return [MainResponse(**item).to_dict() for item in parsed_data]
         except json.JSONDecodeError:
-            print("In first error line:")
-            return []
-        except Exception as e:
-            print("In second error line:", str(e))
             return []
 
 
@@ -44,11 +46,12 @@ def format_output(data, query):
     prompt = f"Вот список обращений: [ {formatted_egov_text} ]"
 
     message_format = (
-        f"Сделай выводы по следующему заявлению и если оно не соответствует теме иссследования: {query}\n"
-        "При несоответствии пропусти его, не включая в ответ.\n"
-        "Если соответствует, то сделай вывод и добавь в общий массив объект с полем link и summary, "
+        f"Проанализируй каждый из этих обращений"
+        "и составь из них один общий массив объектов с полями link и summary, "
         "а также relev_score с твоей оценкой вероятности соответствия.\n"
-        "Верни все результатаы в одном массиве для использование в PYTHON КОДЕ БЕЗ ЛИШНЕГО ТЕКСТА ТОЛЬКО СПИСОК."
+        "помимо этого определи степень положительности обращения: негативное, позитивное или нейтральное в поле opinion\n"
+        "ВЕРНИ ТОЛЬКО РЕЗУЛЬТАТ В JSON ФОРМАТЕ, БЕЗ ПОЯСНИТЕЛЬНОГО ТЕКСТА."
+        f"\nТема исследования: {query}"
     )
 
     final_payload = {
