@@ -14,9 +14,15 @@ class MainResponse(BaseModel):
 class OutputParser(BaseOutputParser):
     def parse(self, text: str) -> List[MainResponse]:
         try:
+            print(text)
             parsed_data = json.loads(text)
+            print(parsed_data)
             return [MainResponse(**item) for item in parsed_data]
+        except json.JSONDecodeError:
+            print("In first error line:")
+            return []
         except Exception as e:
+            print("In second error line:", str(e))
             return []
 
 
@@ -43,7 +49,6 @@ def format_output(data, query):
         "Если соответствует, то сделай вывод и добавь в общий массив объект с полем link и summary, "
         "а также relev_score с твоей оценкой вероятности соответствия.\n"
         "Верни все результатаы в одном массиве для использование в PYTHON КОДЕ БЕЗ ЛИШНЕГО ТЕКСТА ТОЛЬКО СПИСОК."
-        "Если не подходит не один вариант то просто верни пустой список."
     )
 
     final_payload = {

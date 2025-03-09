@@ -66,37 +66,6 @@ result_list = []
 #         'short_description': comment.get('message')
 #     })
 
-# user_query = keywords
-# user_query_str = ", ".join(user_query)
-# url = "https://api.perplexity.ai/chat/completions"
-# headers = {
-#     "Authorization": f"Bearer {PERPLEXITY_API_KEY}",
-#     "Content-Type": "application/json"
-# }
-# payload = {
-#     "model": "llama-3.1-sonar-small-128k-online",
-#     "messages": [
-#         {
-#             "role": "system",
-#             "content": "Будьте точным, СВЕРХКРАТКИМ и лаконичным исследователем для правительства Казахстана. Отвечай все на русском! Исключи анализ НПА и законов."
-#         },
-#         {
-#             "role": "user",
-#             "content": f"Запрос: {user_query_str}. В начало своего ответа поставь мой первичный запрос без пояснений и потом твой ответ"
-#         }
-#     ]
-# }
-# url_response = requests.post(url, json=payload, headers=headers)
-# if url_response.status_code == 200:
-#     json_data = url_response.json()
-#     citations = json_data.get("citations")
-#     research = json_data.get("choices", [{}])[0].get("message", {}).get("content")
-#     print({"citations": citations, "research": research})
-    # response['web'] = {"citations": citations, "research": research}
-
-# result = process_data_from_ai(result_list, question)
-#
-# print(result)
 
 class ProcessStatus(Enum):
     ERROR = 'Error'
