@@ -53,6 +53,7 @@ def format_output(data, query):
         "ВЕРНИ ТОЛЬКО РЕЗУЛЬТАТ В JSON ФОРМАТЕ, БЕЗ ПОЯСНИТЕЛЬНОГО ТЕКСТА."
         f"\nТема исследования: {query}"
     )
+    print(prompt)
 
     final_payload = {
         "prompt": prompt,

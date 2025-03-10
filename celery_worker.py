@@ -297,7 +297,11 @@ def process_egov_nla(self, question, keywords, task_id, begin_date, max_pages):
         result = []
         for query in keywords:
             parsing_result = parse_npa(query, begin_date, max_pages=max_pages)
-            result.append(parsing_result)
+            for record in parsing_result:
+                result.append({
+                    'url': record['detail_url'],
+                    'short_description': record['gov_body'],
+                })
 
             if len(result) >= 2:
                 break
@@ -483,11 +487,12 @@ def process_facebook(self, question, keywords, task_id):
         run = client.actor("us5srxAYnsrkgUv2v").call(run_input=run_input)
 
         for item in client.dataset(run["defaultDatasetId"]).iterate_items():
-            parsed_data.append({
-                "url": item.get('facebookUrl'),
-                "comment_url": item.get('commentUrl'),
-                "short_description": item.get('text')
-            })
+            if item.get('facebookUrl'):
+                parsed_data.append({
+                    "url": item.get('facebookUrl'),
+                    "comment_url": item.get('commentUrl'),
+                    "short_description": "" if item.get('text') is None else item.get('text')
+                })
 
         summary = process_data_from_ai(parsed_data, question)
         summary["all"] = parsed_data
@@ -508,7 +513,7 @@ def process_facebook(self, question, keywords, task_id):
         return {"status": "error", "response": summary}
 
     except Exception as e:
-        track_error(str(e), 'web', ProcessStatus.ERROR)
+        track_error(str(e), 'facebook', ProcessStatus.ERROR)
         return {"status": "error"}
 
 
@@ -544,7 +549,7 @@ def process_instagram(self, question, keywords, task_id):
         client = ApifyClient(APIFY_TOKEN)
 
         run_input = {
-            "directUrls": all_links[:1],
+            "directUrls": all_links,
             "resultsLimit": 20,
         }
 
