@@ -96,7 +96,7 @@ def save_to_postgres(text):
         return {"error": str(e)}
 
 
-def save_request_to_postgres(query):
+def save_request_to_postgres(query, task_id):
     try:
         conn = psycopg2.connect(**DB_CONFIG)
         cursor = conn.cursor()
@@ -105,11 +105,12 @@ def save_request_to_postgres(query):
             CREATE TABLE IF NOT EXISTS history (
                 id SERIAL PRIMARY KEY,
                 query TEXT,
+                task_id VARCHAR(36), 
                 created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
             )
         """)
 
-        cursor.execute("INSERT INTO history (query) VALUES (%s)", (query,))
+        cursor.execute("INSERT INTO history (query, task_id) VALUES (%s, %s)", (query, task_id))
         conn.commit()
 
         cursor.close()
@@ -130,7 +131,7 @@ def search_endpoint():
 
     task = process_search_task.delay(question, full)
 
-    save_request_to_postgres(question)
+    save_request_to_postgres(question, task.id)
 
     return jsonify({"task_id": task.id}), 202
 
@@ -142,7 +143,7 @@ def least_endpoint():
         cursor = conn.cursor()
 
         cursor.execute("""
-                SELECT id, query, created_at
+                SELECT *
                 FROM history
                 ORDER BY created_at DESC
                 LIMIT 10
