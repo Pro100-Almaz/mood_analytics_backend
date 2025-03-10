@@ -548,6 +548,9 @@ def process_instagram(self, question, keywords, task_id):
 
         client = ApifyClient(APIFY_TOKEN)
 
+        if len(all_links) == 0:
+            return {"status": "error", "response": "No links found"}
+
         run_input = {
             "directUrls": all_links,
             "resultsLimit": 20,
