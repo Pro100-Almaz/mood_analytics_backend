@@ -155,7 +155,8 @@ def least_endpoint():
             results.append({
                 "id": record[0],
                 "query": record[1],
-                "created_at": record[2].isoformat() if record[2] else None
+                "task_id": record[2],
+                "created_at": record[3].isoformat() if record[3] else None
             })
 
         cursor.close()
@@ -211,19 +212,7 @@ def search_status(task_id):
 def generate_document(task_id):
     try:
 
-        doc = DocxTemplate("template.docx")
-
-        context = {
-            "title": row[1],
-            "date": row[2],
-            "statistic": row[3],
-            "description": row[4],
-            "source": row[5],
-            "articles_publication": row[6],
-            "opinion": row[7],
-            "dominating_opinion": row[8]
-        }
-        doc.render(context)
+        doc = DocxTemplate("template.pages")
 
         buffer = io.BytesIO()
         doc.save(buffer)
@@ -321,7 +310,10 @@ def fetch_document():
         cursor.close()
         conn.close()
 
-        doc = DocxTemplate("template.docx")
+        with open("template.pages", "rb") as f:
+            template_data = io.BytesIO(f.read())
+
+        doc = DocxTemplate(template_data)
 
         context = {
             "title": row[1],
