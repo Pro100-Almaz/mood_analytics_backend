@@ -209,7 +209,7 @@ def search_status(task_id):
 
     return jsonify(response)
 
-@app.route('/generate_digest/<task_id>', methods=['GET'])
+@app.route('/generate_digest/<task_id>', methods=['POST'])
 def generate_document(task_id):
     from celery.result import AsyncResult
     task = AsyncResult(task_id)
