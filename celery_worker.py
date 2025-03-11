@@ -457,7 +457,7 @@ def process_facebook(self, question, keywords, task_id):
         search_query = keywords[0]
 
         query = f"site:facebook.com {search_query}"
-        cx = '969efef82512648ba'
+        cx = 'us5srxAYnsrkgUv2v'
 
         all_links = []
         parsed_data = []
@@ -522,7 +522,7 @@ def process_instagram(self, question, keywords, task_id):
     try:
         search_query = keywords[0]
         query = f"site:instagram.com {search_query}"
-        cx = '969efef82512648ba'
+        cx = 'SbK00X0JYCPblD2wp'
         pattern = re.compile(r"(https?:\/\/(?:www\.)?instagram\.com\/(?:p|reel)\/([^/?#&]+)).*")
 
         all_links = []

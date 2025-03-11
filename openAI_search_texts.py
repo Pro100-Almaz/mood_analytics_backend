@@ -26,6 +26,22 @@ opinion_prompt = """
 }
 """
 
+rule_description_prompt = """
+Ты выступаешь в роли аналитика законодательных инициатив и общественного мнения, специализирующегося на анализе законодательства Республики Казахстан. Твоя задача – предоставить подробное, всестороннее и аргументированное описание указанного ниже правила. Обязательно удели внимание следующим аспектам:
+
+1. Кратко изложи содержание и цель данного правила.
+2. Проанализируй, как правило отражает или влияет на общественное мнение по закону в Республике Казахстан.
+3. Оцени потенциальные социальные, правовые и политические последствия его применения.
+4. Учти исторические и культурные особенности, которые могут повлиять на его интерпретацию и воздействие.
+5. Предложи возможные направления для дальнейшего анализа или развития в контексте данного закона.
+
+Пожалуйста, предоставь развернутое описание, подкрепленное примерами, где это необходимо.
+
+Текст правила:
+
+
+"""
+
 prompt = """
 You are research helper for институт парламентаризма Казахстана. I give you prompt to research on and you choose ONLY RELEVANT tools and its parameters to be used by further agents. Return as JSON. if you decide to not to use any given type for a tool, still just pass a type with an empty null params array. Все ключевые запросы только на русском|предположим: Egov Budgets тебе не нужен, ты все равно пришлешь type: Budgets, keywords: []
 
@@ -157,12 +173,13 @@ def process_search_queries(user_message):
         return {'status': 'error', 'error': str(e)}
 
 
-def get_digest_data(opinion_list):
+def get_digest_description(rule):
     try:
+        prompt = rule_description_prompt + "\n" + rule
         response = client.chat.completions.create(model="gpt-4",
             messages=[
                 {"role": "system", "content": "Ты помощник для проведения исследования."},
-                {"role": "user", "content": opinion_list}
+                {"role": "user", "content": prompt}
             ],
             temperature=0.7,
             max_tokens=1500

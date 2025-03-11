@@ -8,6 +8,7 @@ from dotenv import load_dotenv
 from flask_cors import CORS
 from celery_worker import process_search_task
 from docxtpl import DocxTemplate
+from openAI_search_texts import get_digest_description
 
 load_dotenv()
 app = Flask(__name__)
@@ -210,9 +211,70 @@ def search_status(task_id):
 
 @app.route('/generate_digest/<task_id>', methods=['GET'])
 def generate_document(task_id):
-    try:
+    from celery.result import AsyncResult
+    task = AsyncResult(task_id)
 
-        doc = DocxTemplate("template.pages")
+    data = request.json
+    all_opinion = data.get("all_opinion", 0)
+    negative_opinion = data.get("negative_opinion", 0)
+    positive_opinion = data.get("positive_opinion", 0)
+    neutral_opinion = data.get("neutral_opinion", 0)
+
+    # process_ids = getattr(task, "process_ids", {})
+    #
+    # if not process_ids:
+    #     return jsonify({"error": "No data found in process"}), 400
+    try:
+        conn = psycopg2.connect(**DB_CONFIG)
+        cursor = conn.cursor()
+
+        cursor.execute("""
+            SELECT question
+            FROM search 
+            WHERE celery_id = %s
+        """, (task_id,))
+
+        question = cursor.fetchone()
+
+        if not question:
+            return jsonify({"error": "No data found in process"}), 400
+
+        cursor.close()
+        conn.close()
+
+        with open("template.pages", "rb") as f:
+            template_data = io.BytesIO(f.read())
+
+        doc = DocxTemplate(template_data)
+
+        context = {
+            "title": question[0],
+            "date": "ЗРК от 21 февраля 2019 года № 227-VІ /опубл. 27.02.2019",
+            "statistic": "Законов – 10 , статьи - 31",
+            "description": get_digest_description(question[0]),
+            "source": "Были проанализированы комментарии, выложенные после публикации статьи о принятии закона на следующих онлайн-платформах: \n"
+                      "https://adilet.zan.kz/rus/search/docs/ \n"
+                      "https://dialog.egov.kz/search \n"
+                      "https://legalacts.egov.kz/list \n"
+                      "https://data.egov.kz"
+                      "https://instagram.com"
+                      "https://facebook.com",
+            "articles_publication": "",
+            "opinion": f"""
+            Всего – {all_opinion} комментария, из них:
+
+Положительные отзывы:
+{positive_opinion} комментариев 
+
+Отрицательные отзывы: 
+{negative_opinion} комментариев
+
+Нейтральные отзывы:
+{neutral_opinion} комментариев
+""",
+            "dominating_opinion": ""
+        }
+        doc.render(context)
 
         buffer = io.BytesIO()
         doc.save(buffer)
@@ -226,7 +288,7 @@ def generate_document(task_id):
         )
 
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        return jsonify({"error": str(e)}), 400
 
 @app.route("/upload", methods=["POST"])
 def upload_file():
