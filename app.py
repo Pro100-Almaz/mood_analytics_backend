@@ -229,8 +229,8 @@ def generate_document(task_id):
         cursor = conn.cursor()
 
         cursor.execute("""
-            SELECT question
-            FROM search 
+            SELECT query
+            FROM history 
             WHERE celery_id = %s
         """, (task_id,))
 
