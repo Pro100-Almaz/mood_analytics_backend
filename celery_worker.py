@@ -486,7 +486,7 @@ def process_facebook(self, question, keywords, task_id):
             "viewOption": "RANKED_UNFILTERED",
         }
 
-        run = client.actor("SbK00X0JYCPblD2wp").call(run_input=run_input)
+        run = client.actor("us5srxAYnsrkgUv2v").call(run_input=run_input)
 
         for item in client.dataset(run["defaultDatasetId"]).iterate_items():
             if item.get('facebookUrl'):
