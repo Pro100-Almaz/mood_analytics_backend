@@ -212,7 +212,7 @@ def search_status(task_id):
 
 @app.route('/get_opinion', methods=['POST'])
 def analyze_law_opinions(model_name: str = "gpt-4"):
-    from langchain_community.chat_models import ChatOpenAI
+    from langchain_openai import ChatOpenAI
     from langchain_core.messages import SystemMessage, HumanMessage
 
     chat = ChatOpenAI(model_name=model_name)
