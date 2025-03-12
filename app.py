@@ -246,6 +246,8 @@ def generate_document(task_id):
     negative_opinion = data.get("negative_opinion", 0)
     positive_opinion = data.get("positive_opinion", 0)
     neutral_opinion = data.get("neutral_opinion", 0)
+    dominating_opinion = data.get("dominating_opinion", 0)
+
 
     try:
         conn = psycopg2.connect(**DB_CONFIG)
@@ -295,7 +297,7 @@ def generate_document(task_id):
 Нейтральные отзывы:
 {neutral_opinion} комментариев
 """,
-            "dominating_opinion": ""
+            "dominating_opinion": dominating_opinion
         }
         doc.render(context)
 
