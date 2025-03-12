@@ -459,7 +459,7 @@ def process_facebook(self, question, keywords, task_id):
         search_query = keywords[0]
 
         query = f"site:facebook.com {search_query}"
-        cx = 'us5srxAYnsrkgUv2v'
+        cx = '969efef82512648ba'
 
         all_links = []
         parsed_data = []
@@ -486,7 +486,7 @@ def process_facebook(self, question, keywords, task_id):
             "viewOption": "RANKED_UNFILTERED",
         }
 
-        run = client.actor(cx).call(run_input=run_input)
+        run = client.actor("SbK00X0JYCPblD2wp").call(run_input=run_input)
 
         for item in client.dataset(run["defaultDatasetId"]).iterate_items():
             if item.get('facebookUrl'):
@@ -524,7 +524,7 @@ def process_instagram(self, question, keywords, task_id):
     try:
         search_query = keywords[0]
         query = f"site:instagram.com {search_query}"
-        cx = 'SbK00X0JYCPblD2wp'
+        cx = '969efef82512648ba'
         pattern = re.compile(r"(https?:\/\/(?:www\.)?instagram\.com\/(?:p|reel)\/([^/?#&]+)).*")
 
         all_links = []
@@ -558,7 +558,7 @@ def process_instagram(self, question, keywords, task_id):
             "resultsLimit": 20,
         }
 
-        run = client.actor(cx).call(run_input=run_input)
+        run = client.actor("SbK00X0JYCPblD2wp").call(run_input=run_input)
 
         for item in client.dataset(run["defaultDatasetId"]).iterate_items():
             if item.get('postUrl', None):
