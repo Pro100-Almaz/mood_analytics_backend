@@ -209,6 +209,27 @@ def search_status(task_id):
 
     return jsonify(response)
 
+
+@app.route('/get_opinion', methods=['POST'])
+def analyze_law_opinions(opinions: str, model_name: str = "gpt-4"):
+    from langchain_community.chat_models import ChatOpenAI
+    from langchain_core.messages import SystemMessage, HumanMessage
+
+    chat = ChatOpenAI(model_name=model_name)
+
+    messages = [
+        SystemMessage(content=(
+            "Ты должен проанализировать данные, которые я тебе дам и дать результирующую и "
+            "обобщающую рецензию. Данные представляют собой различные мнения людей о "
+            "тех или иных правках в законе. Ты должен дать своё описание мнения населения."
+            "ВСЕГДА ДАВАЙ В КОНЦЕ СВОЁ МНЕНИЕ: доминирующее мнение является отрицательным, позитивным или же нейтральным?"
+        )),
+        HumanMessage(content=str(opinions))
+    ]
+
+    response = chat.invoke(messages)
+    return jsonify({"response": response.content})
+
 @app.route('/generate_digest/<task_id>', methods=['POST'])
 def generate_document(task_id):
     from celery.result import AsyncResult
@@ -220,10 +241,6 @@ def generate_document(task_id):
     positive_opinion = data.get("positive_opinion", 0)
     neutral_opinion = data.get("neutral_opinion", 0)
 
-    # process_ids = getattr(task, "process_ids", {})
-    #
-    # if not process_ids:
-    #     return jsonify({"error": "No data found in process"}), 400
     try:
         conn = psycopg2.connect(**DB_CONFIG)
         cursor = conn.cursor()

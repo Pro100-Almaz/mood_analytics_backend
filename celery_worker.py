@@ -196,6 +196,8 @@ def process_search_task(self, question, full=False):
                     "task_id": task.id
                 })
 
+
+
         return {"status": "success", "process_ids": process_ids}
 
     except Exception as e:
@@ -440,7 +442,7 @@ def process_web(self, question, keywords, task_id):
                         "INSERT INTO {} (task_id, data) VALUES (%s, %s)"
                     ).format(sql.Identifier("web"))
 
-                    cursor.execute(query,(task_id, Json(summary)))
+                    cursor.execute(query,(task_id, Json(summary.get("ai_response"))))
                     conn.commit()
 
             return {"status": "success", "response": summary}
@@ -505,7 +507,7 @@ def process_facebook(self, question, keywords, task_id):
                         "INSERT INTO {} (task_id, data) VALUES (%s, %s)"
                     ).format(sql.Identifier("facebook"))
 
-                    cursor.execute(query, (task_id, Json(parsed_data)))
+                    cursor.execute(query, (task_id, Json(summary.get("ai_response"))))
                     conn.commit()
 
             return {"status": "success", "response": summary}
@@ -576,7 +578,7 @@ def process_instagram(self, question, keywords, task_id):
                         "INSERT INTO {} (task_id, data) VALUES (%s, %s)"
                     ).format(sql.Identifier("instagram"))
 
-                    cursor.execute(query, (task_id, Json(parsed_data)))
+                    cursor.execute(query, (task_id, Json(summary.get("ai_response"))))
                     conn.commit()
 
             return {"status": "success", "response": summary}

@@ -22,6 +22,21 @@ class ProcessStatus(Enum):
     INFO = 'Info'
 
 
+def analyze_law_opinions(opinions: str, model_name: str = "gpt-4") -> str:
+    chat = ChatOpenAI(model_name=model_name)
+
+    messages = [
+        SystemMessage(content=(
+            "Ты должен проанализировать данные, которые я тебе дам и дать результирующую и "
+            "обобщающую рецензию. Данные представляют собой различные мнения людей о "
+            "тех или иных правках в законе. Ты должен дать своё описание мнения населения."
+            "ВСЕГДА ДАВАЙ В КОНЦЕ СВОЁ МНЕНИЕ: доминирующее мнение является отрицательным, позитивным или же нейтральным?"
+        )),
+        HumanMessage(content=str(opinions))
+    ]
+
+    response = chat.invoke(messages)
+    return response.content
 
 res = process_facebook(question=question, keywords=keywords, task_id=1)
 print(res)
