@@ -69,7 +69,7 @@ def process_data_from_ai(result, question):
     )
 
     shortened_prompt = " ".join(prompt_text.split())
-    shortened_prompt = shortened_prompt if len(shortened_prompt) <= 10000 else shortened_prompt[:10000]
+    shortened_prompt = shortened_prompt if len(shortened_prompt) <= 6000 else shortened_prompt[:6000]
 
     try:
         response = model.invoke(shortened_prompt)
