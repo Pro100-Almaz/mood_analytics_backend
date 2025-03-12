@@ -211,11 +211,17 @@ def search_status(task_id):
 
 
 @app.route('/get_opinion', methods=['POST'])
-def analyze_law_opinions(opinions: str, model_name: str = "gpt-4"):
+def analyze_law_opinions(model_name: str = "gpt-4"):
     from langchain_community.chat_models import ChatOpenAI
     from langchain_core.messages import SystemMessage, HumanMessage
 
     chat = ChatOpenAI(model_name=model_name)
+
+    data = request.json
+    opinions = data.get("opinions", [])
+
+    if not opinions:
+        return jsonify({"error": "No opinions found"})
 
     messages = [
         SystemMessage(content=(
