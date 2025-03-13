@@ -397,7 +397,7 @@ def fetch_document():
         cursor.close()
         conn.close()
 
-        with open("template.pages", "rb") as f:
+        with open("template.docx", "rb") as f:
             template_data = io.BytesIO(f.read())
 
         doc = DocxTemplate(template_data)
